@@ -3,6 +3,8 @@ from gurobipy import GRB
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
+
+
 # Constants for constraints to avoid using floating-point numbers directly in the code
 THETA_DC = 2           # Maximum number of selectors allowed
 THETA_CC = 2           # Minimum coverage required for the subgroup
@@ -151,35 +153,9 @@ def run_optimization(model):
     model.optimize()
     if model.status == GRB.OPTIMAL:
         print("Optimal solution found:")
-        display_results(model)
     else:
         print("No optimal solution found.")
 
-def display_results(model, n_cases, selectors, data):
-    """
-    Display the optimization results, including the selected subgroup and active selectors.
-    
-    Parameters:
-        model (gp.Model): Gurobi model.
-        n_cases (int): Number of cases in the dataset.
-        selectors (dict): Dictionary of selectors indicating conditions to be considered.
-        data (pd.DataFrame): Original preprocessed DataFrame.
-    """
-    # Retrieve decision variables from the model
-    T = model.getVars()[:n_cases]
-    D = model.getVars()[n_cases:n_cases + len(selectors)]
-
-    # Identify the selected subgroup based on the optimized T variables
-    selected_subgroup = [data.iloc[c] for c in range(n_cases) if T[c].x > 0.5]
-
-    print("\nData points in the selected subgroup:")
-    for case in selected_subgroup:
-        print(case.to_dict())
-
-    print("\nSelectors used in the subgroup description:")
-    for i, selector_name in enumerate(selectors.keys()):
-        if D[i].x > 0.5:
-            print(f"Selector {selector_name}: {D[i].x}")
 
 def main(file_path):
     """
@@ -203,9 +179,7 @@ def main(file_path):
     
     # Step 5: Run optimization
     run_optimization(model)
-    
-    # Step 6: Display results
-    display_results(model, n_cases, selectors, data)
+
 
 
 if __name__ == "__main__":
