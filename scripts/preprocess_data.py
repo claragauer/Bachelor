@@ -2,6 +2,7 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder, StandardScaler, MinMaxScaler
 from scipy.stats import zscore
 from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import RandomUnderSampler
 import os
 
 Z_SCORE_THRESHOLD = 1.5 # Common threshold for identifying outliers, experimental value
@@ -60,7 +61,38 @@ def encode_categorical_columns(df, columns):
         label_encoders[column] = le
     return df, label_encoders
 
-def handle_outliers(df, columns, method='z-score', threshold=3):
+# Balancing data is an important step, especially when one class outnumbers the other. 
+# This imbalance can lead to biased models that perform well on the majority class but poorly on the minority class
+# Balancing techniques like oversampling and undersampling help that the classes are represented more equally in the training set
+
+def balance_data(df, target, method='oversample'):
+    """
+    Balance the dataset.
+    
+    Parameters:
+        df (pd.DataFrame): The DataFrame to process.
+        target (str): Target column for balancing.
+        method (str): Method for balancing data ('oversample', 'undersample').
+        
+    Returns:
+        pd.DataFrame: Balanced DataFrame.
+    """
+    # creates synthetic samples for the minority class to increase its size to match the majority class
+    if method == 'oversample':
+        sm = SMOTE()
+        X, y = sm.fit_resample(df.drop(columns=[target]), df[target])
+        # combines into a new dataframe
+        df = pd.concat([pd.DataFrame(X), pd.DataFrame(y, columns=[target])], axis=1)
+    # technique that randomly selects a subset of the majority class to reduce its size to match the minority class.
+    elif method == 'undersample':
+        rus = RandomUnderSampler()
+        X, y = rus.fit_resample(df.drop(columns=[target]), df[target])
+        df = pd.concat([pd.DataFrame(X), pd.DataFrame(y, columns=[target])], axis=1)
+    else:
+        raise ValueError("Invalid method. Use 'oversample' or 'undersample'.")
+    return df
+
+def handle_outliers(df, columns, method='z-score', threshold=Z_SCORE_THRESHOLD):
     """
     Handle outliers in the dataset.
     
@@ -74,10 +106,11 @@ def handle_outliers(df, columns, method='z-score', threshold=3):
         pd.DataFrame: DataFrame with outliers handled.
     """
 
+    # Z score: Outliers are defined as data points that are significantly different from the mean of the dataset
     if method == 'z-score':
-        # Compute z-scores for the specified columns
         return df[(zscore(df[columns]) < Z_SCORE_THRESHOLD).all(axis=1)] # Outliers are removed 
 
+    # IQR: Outliers are values that fall outside the IQR 
     elif method == 'iqr':
         Q1 = df[columns].quantile(0.25)
         Q3 = df[columns].quantile(0.75)

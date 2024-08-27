@@ -10,7 +10,8 @@ from scripts.preprocess_data import (
     handle_missing_values,
     encode_categorical_columns,
     preprocess_data, 
-    handle_outliers
+    handle_outliers, 
+    balance_data
 )
 import os
 
@@ -71,6 +72,29 @@ class TestDataPreprocessing(unittest.TestCase):
         # Check if label encoders are returned
         self.assertIn('Color', encoders)
         self.assertIn('Shape', encoders)
+
+    def test_balancing_methods(self):
+        """
+        Test data balancing methods: oversample and undersample.
+        """
+        # Create an imbalanced dataset
+        df_imbalanced = pd.DataFrame({
+            'Feature1': [1, 2, 3, 4, 5, 6],
+            'Label': [0, 0, 0, 1, 1, 1]  # Equal classes for simplicity in demonstration
+        })
+
+        # Test oversampling
+        df_oversampled = balance_data(df_imbalanced.copy(), target='Label', method='oversample')
+        count_class_0 = df_oversampled[df_oversampled['Label'] == 0].shape[0]
+        count_class_1 = df_oversampled[df_oversampled['Label'] == 1].shape[0]
+        self.assertEqual(count_class_0, count_class_1)  # Check if classes are balanced
+
+        # Test undersampling
+        df_undersampled = balance_data(df_imbalanced.copy(), target='Label', method='undersample')
+        count_class_0 = df_undersampled[df_undersampled['Label'] == 0].shape[0]
+        count_class_1 = df_undersampled[df_undersampled['Label'] == 1].shape[0]
+        self.assertEqual(count_class_0, count_class_1)  # Check if classes are balanced
+
 
     def test_remove_outliers(self):
         """
