@@ -13,7 +13,6 @@ from scripts.preprocess_data import (
     handle_outliers, 
     balance_data
 )
-import os
 
 class TestDataPreprocessing(unittest.TestCase):
     
