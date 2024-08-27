@@ -43,5 +43,6 @@ def test_pipeline():
 
     print("\nAll tests completed.")
 
+
 if __name__ == '__main__':
     test_pipeline()

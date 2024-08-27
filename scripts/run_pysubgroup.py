@@ -1,20 +1,27 @@
 import pysubgroup as ps
 import pandas as pd
 import os
+from scripts.preprocess_data import preprocess_data_low_level
+# Constants
+TARGET_VALUE = 1
 
-def load_data(file_path):
+def preprocess_data(file_path):
     """
-    Load dataset from a CSV file.
-    
+    Load and preprocess the data using a lower-level preprocessing function.
+
     Parameters:
         file_path (str): Path to the CSV file.
         
     Returns:
-        pd.DataFrame: Loaded DataFrame.
+        pd.DataFrame: Preprocessed DataFrame.
+        dict: Dictionary of LabelEncoders.
     """
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
-    return pd.read_csv(file_path)
+    # Call the lower-level preprocess data function
+    df= preprocess_data_low_level(file_path)
+
+    # Return the preprocessed DataFrame and label encoders
+    return df
+
 
 def define_target(df):
     """
@@ -26,8 +33,8 @@ def define_target(df):
     Returns:
         ps.BinaryTarget: The target for subgroup discovery.
     """
-    # Define the target variable. Assuming 'Label' is the target column with binary values.
-    target = ps.BinaryTarget('Label', 1)
+    # Define the target variable. 'Label' is the target column with binary values.
+    target = ps.BinaryTarget('Label', TARGET_VALUE)
     print(target)
     return target
 
@@ -58,7 +65,7 @@ def run_subgroup_discovery(df, target, search_space):
     Returns:
         pd.DataFrame: DataFrame with the results of subgroup discovery.
     """
-    # Define the quality function (Weighted Relative Accuracy)
+    # Define the quality function (Weighted Relative Accuracy (WRAcc))
     quality_function = ps.WRAccQF()
 
     # Create the Apriori algorithm object
@@ -109,8 +116,8 @@ def main(file_path):
         file_path (str): Path to the CSV file.
     """
     # Load and preprocess data
-    df = load_data(file_path)
-    
+    df = preprocess_data(file_path)
+
     # Define target for subgroup discovery
     target = define_target(df)
     
@@ -124,6 +131,4 @@ def main(file_path):
     display_results(result_df)
 
 if __name__ == "__main__":
-    # Example file path (modify this to your actual file path or use sys.argv to accept input)
-    file_path = 'CodingExamples/test/test6.csv'
-    main(file_path)
+    main()

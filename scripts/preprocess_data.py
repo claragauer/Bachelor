@@ -54,14 +54,12 @@ def encode_categorical_columns(df, columns):
         
     Returns:
         pd.DataFrame: DataFrame with encoded categorical columns.
-        dict: Dictionary of LabelEncoders for each column.
     """
-    label_encoders = {}
     for column in columns:
         le = LabelEncoder()
         df[column] = le.fit_transform(df[column])
-        label_encoders[column] = le
-    return df, label_encoders
+    
+    return df  
 
 
 def balance_data(df, target, method='oversample'):
@@ -115,17 +113,17 @@ def handle_outliers(df, columns, method='z-score', threshold=Z_SCORE_THRESHOLD):
         raise ValueError("Invalid method. Use 'z-score' or 'iqr'.")
 
 
-def preprocess_data(file_path, categorical_columns):
+def preprocess_data_low_level(file_path):
     """
-    Load and preprocess data.
+    Load and preprocess data by handling missing values, encoding categorical variables,
+    balancing the dataset, and handling outliers.
 
     Parameters:
         file_path (str): Path to the CSV file.
-        categorical_columns (list): List of categorical columns to encode.
         
     Returns:
         pd.DataFrame: Preprocessed DataFrame.
-        dict: Dictionary of LabelEncoders.
+        dict: Dictionary of LabelEncoders used for encoding categorical columns.
     """
     # Load data
     df = load_data(file_path)
@@ -135,8 +133,20 @@ def preprocess_data(file_path, categorical_columns):
     df = handle_missing_values(df)
     print("Missing values handled.")
     
+    # Directly specify the categorical columns
+    categorical_columns = ['Color', 'Shape']  
+    
     # Encode categorical columns
-    df, label_encoders = encode_categorical_columns(df, categorical_columns)
+    df = encode_categorical_columns(df, categorical_columns)
     print("Categorical columns encoded.")
     
-    return df, label_encoders
+    # Example usage of other preprocessing functions:
+    # Balance data
+    df = balance_data(df, target='Label', method='oversample')
+    print("Data balanced.")
+
+    # Handle outliers
+    df = handle_outliers(df, columns=df.columns, method='z-score')
+    print("Outliers handled.")
+
+    return df

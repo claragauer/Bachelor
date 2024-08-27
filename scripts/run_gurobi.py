@@ -2,39 +2,47 @@ import gurobipy as gp
 from gurobipy import GRB
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
-
-
+from preprocess_data import load_data, handle_missing_values, handle_outliers, encode_categorical_columns, balance_data
 
 # Constants for constraints to avoid using floating-point numbers directly in the code
 THETA_DC = 2           # Maximum number of selectors allowed
 THETA_CC = 2           # Minimum coverage required for the subgroup
 THETA_MAX_RATIO = 0.5  # Maximum ratio of cases that can be included in the subgroup
 
-def load_and_preprocess_data(file_path):
+def load_and_preprocess_data(file_path, categorical_columns, target_column, outlier_columns, balance_method='oversample', outlier_method='z-score'):
     """
-    Load and preprocess dataset by handling missing values and encoding categorical variables.
+    Load and preprocess dataset by handling missing values, encoding categorical variables, 
+    balancing data, and handling outliers.
     
     Parameters:
         file_path (str): Path to the CSV file.
+        categorical_columns (list): List of categorical columns to encode.
+        target_column (str): Name of the target column for balancing.
+        outlier_columns (list): List of columns to check for outliers.
+        balance_method (str): Method for balancing data ('oversample' or 'undersample').
+        outlier_method (str): Method to handle outliers ('z-score' or 'iqr').
         
     Returns:
         pd.DataFrame: Preprocessed DataFrame.
         dict: Dictionary of LabelEncoders used for encoding categorical columns.
     """
-    # Load dataset
-    data = pd.read_csv(file_path)
+    # Step 1: Load dataset
+    df = load_data(file_path)
 
-    # Handle Missing Values by forward filling
-    data.ffill(inplace=True)
+    # Step 2: Handle Missing Values
+    df = handle_missing_values(df, method='ffill')
 
-    # Encode Categorical Variables using LabelEncoder
-    label_encoders = {}
-    for column in ['Color', 'Shape']:  # Specify all categorical columns to encode
-        le = LabelEncoder()
-        data[column] = le.fit_transform(data[column])
-        label_encoders[column] = le
+    # Step 3: Encode Categorical Variables
+    df, label_encoders = encode_categorical_columns(df, categorical_columns)
 
-    return data, label_encoders
+    # Step 4: Handle Outliers
+    df = handle_outliers(df, outlier_columns, method=outlier_method)
+
+    # Step 5: Balance Data
+    df = balance_data(df, target_column, method=balance_method)
+
+    return df, label_encoders
+
 
 def define_selectors(data):
     """
