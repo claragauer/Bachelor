@@ -4,7 +4,7 @@ from scipy.stats import zscore
 from imblearn.over_sampling import SMOTE
 import os
 
-Z_SCORE_THRESHOLD = 3  # Common threshold for identifying outliers
+Z_SCORE_THRESHOLD = 1.5 # Common threshold for identifying outliers, experimental value
 IQR_MULTIPLIER = 1.5     # Constant for IQR calculation
 
 
@@ -73,9 +73,11 @@ def handle_outliers(df, columns, method='z-score', threshold=3):
     Returns:
         pd.DataFrame: DataFrame with outliers handled.
     """
-    # Z score measures how many standard deviations a data point is from the mean of distribution 
+
     if method == 'z-score':
+        # Compute z-scores for the specified columns
         return df[(zscore(df[columns]) < Z_SCORE_THRESHOLD).all(axis=1)] # Outliers are removed 
+
     elif method == 'iqr':
         Q1 = df[columns].quantile(0.25)
         Q3 = df[columns].quantile(0.75)
@@ -83,7 +85,6 @@ def handle_outliers(df, columns, method='z-score', threshold=3):
         return df[~((df[columns] < (Q1 - IQR_MULTIPLIER * IQR)) | (df[columns] > (Q3 + IQR_MULTIPLIER * IQR))).any(axis=1)]  # Remove outliers using IQR
     else:
         raise ValueError("Invalid method. Use 'z-score' or 'iqr'.")
-
 
 def preprocess_data(file_path, categorical_columns):
     """

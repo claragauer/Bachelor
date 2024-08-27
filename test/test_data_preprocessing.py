@@ -9,7 +9,8 @@ from scripts.preprocess_data import (
     load_data,
     handle_missing_values,
     encode_categorical_columns,
-    preprocess_data
+    preprocess_data, 
+    handle_outliers
 )
 import os
 
@@ -70,6 +71,28 @@ class TestDataPreprocessing(unittest.TestCase):
         # Check if label encoders are returned
         self.assertIn('Color', encoders)
         self.assertIn('Shape', encoders)
+
+    def test_remove_outliers(self):
+        """
+        Test outlier removal.
+        """
+        self.data['Value'] = [10, 15, 10, 12, 150]  # 150 is an outlier which can only be detected by a lower threshold of 1.5
+
+        # Test with z-score method
+        Z_SCORE_THRESHOLD = 3.0  # Ensure this matches your code's constant or set it appropriately
+        df_no_outliers_zscore = handle_outliers(self.data.copy(), ['Value'], method='z-score')
+    
+        # Test with IQR method
+        df_no_outliers_iqr = handle_outliers(self.data.copy(), ['Value'], method='iqr')
+
+        # Check that the outlier is removed using both methods
+        self.assertEqual(len(df_no_outliers_zscore), 4)  # Expecting 4 rows after removing the outlier with z-score
+        self.assertEqual(len(df_no_outliers_iqr), 4)     # Expecting 4 rows after removing the outlier with IQR
+
+        # Check that the outlier (100 in 'Value') is not in the resulting DataFrames
+        self.assertNotIn(100, df_no_outliers_zscore['Value'].values)
+        self.assertNotIn(100, df_no_outliers_iqr['Value'].values)
+
 
     def test_preprocess_data(self):
         """
