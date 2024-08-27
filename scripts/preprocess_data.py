@@ -74,6 +74,9 @@ def balance_data(df, target, method='oversample'):
     Returns:
         pd.DataFrame: Balanced DataFrame.
     """
+    if df[target].nunique() <= 1:
+        raise ValueError(f"The target '{target}' needs to have more than 1 class. Got {df[target].nunique()} class instead.")
+
     if method == 'oversample':
         sm = SMOTE()
         X, y = sm.fit_resample(df.drop(columns=[target]), df[target])
