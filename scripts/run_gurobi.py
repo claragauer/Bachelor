@@ -30,7 +30,7 @@ def load_and_preprocess_data(file_path):
     df = load_data(file_path)
 
     # Step 2: Handle Missing Values
-    #df = handle_missing_values(df, method='ffill')
+    df = handle_missing_values(df, method='ffill')
 
     # Step 3: Encode Categorical Variables
     #df, label_encoders = encode_categorical_columns(df, categorical_columns)

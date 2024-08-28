@@ -1,7 +1,7 @@
 import pysubgroup as ps
 import pandas as pd
 import os
-from scripts.preprocess_data import load_data
+from scripts.preprocess_data import load_data, handle_missing_values
 # Constants
 TARGET_VALUE = 1
 
@@ -16,13 +16,21 @@ def load_and_preprocess_data(file_path):
         pd.DataFrame: Preprocessed DataFrame.
         dict: Dictionary of LabelEncoders.
     """
-    try:
-        df = pd.read_csv(file_path)
-        print("Data loaded successfully.")
-        return df
-    except Exception as e:
-        print(f"An error occurred while loading data: {e}")
-        return None
+    # Step 1: Load dataset
+    df = load_data(file_path)
+
+    # Step 2: Handle Missing Values
+    df = handle_missing_values(df, method='ffill')
+
+    # Step 3: Encode Categorical Variables
+    #df, label_encoders = encode_categorical_columns(df, categorical_columns)
+
+    # Step 4: Handle Outliers
+    #df = handle_outliers(df, outlier_columns, method=outlier_method)
+
+    # Step 5: Balance Data
+    #df = balance_data(df, target_column, method=balance_method)
+    return df
 
 
 def define_target(df):

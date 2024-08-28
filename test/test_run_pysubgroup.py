@@ -1,11 +1,15 @@
 import os
 import sys
+import pandas as pd
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts.run_pysubgroup import main  
+from scripts.run_pysubgroup import main, load_and_preprocess_data
 
-def test_pipeline():
+def test_pipeline(selected_tests=None):
     """
-    Test the full pipeline with multiple CSV files.
+    Test the full pipeline with selected CSV files.
+
+    Parameters:
+        selected_tests (list, optional): List of CSV filenames to run. If None, all tests are run.
     """
     # Directory containing the CSV files
     data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../test/test_data/'))
@@ -14,12 +18,16 @@ def test_pipeline():
         print(f"Directory {data_dir} does not exist. Please check the path.")
         return
     
-    csv_files = [f for f in os.listdir(data_dir) if f.startswith('test') and f.endswith('.csv')]
+    # If no specific tests are selected, run all available test CSV files
+    if selected_tests is None:
+        csv_files = [f for f in os.listdir(data_dir) if f.startswith('test') and f.endswith('.csv')]
+    else:
+        csv_files = [f for f in selected_tests if f.startswith('test') and f.endswith('.csv')]
 
     # Dictionary to store results
     results = {}
 
-    # Loop over each CSV file and run the main function
+    # Loop over each selected CSV file and run the main function
     for csv_file in csv_files:
         print(f"\nRunning optimization for {csv_file}...")
         file_path = os.path.join(data_dir, csv_file)
@@ -44,5 +52,51 @@ def test_pipeline():
     print("\nAll tests completed.")
 
 
+def check_missing_values(df):
+    """
+    Check for missing values in the DataFrame and print the count of missing values per column.
+
+    Parameters:
+        df (pd.DataFrame): The DataFrame to check.
+    """
+    missing_values = df.isnull().sum()
+    if missing_values.any():
+        print("Missing values detected in the DataFrame:")
+        print(missing_values)
+    else:
+        print("No missing values detected in the DataFrame.")
+
+def test_missing_values_in_test_files():
+    """
+    Test to check for missing values in test9encodeMissing.csv and test10encodeMissing.csv.
+    """
+    # Directory containing the CSV files
+    data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../test/test_data/'))
+
+    # Test files
+    test_files = ['test7missing.csv', 'test8missing.csv', 'test10missing.csv', 'test9missing.csv']
+
+    for test_file in test_files:
+        print(f"\nChecking for missing values in {test_file}...")
+        file_path = os.path.join(data_dir, test_file)
+
+        # Load the data
+        try:
+            df = load_and_preprocess_data(file_path)
+        except FileNotFoundError:
+            print(f"File {test_file} not found in {data_dir}. Please check the path.")
+            continue
+
+        # Check for missing values
+        check_missing_values(df)
+
 if __name__ == '__main__':
-    test_pipeline()
+    test_missing_values_in_test_files()
+
+if __name__ == '__main__':
+    # Specify the tests you want to run by passing a list of filenames.
+    test_pipeline(selected_tests=['test10encodeMissing.csv', 'test9encodeMissing.csv'])
+    test_missing_values_in_test_files()
+
+    # To run all tests, call without arguments:
+    #test_pipeline()
