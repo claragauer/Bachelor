@@ -2,14 +2,14 @@ import gurobipy as gp
 from gurobipy import GRB
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
-from preprocess_data import load_data, handle_missing_values, handle_outliers, encode_categorical_columns, balance_data
+from scripts.preprocess_data import load_data, handle_missing_values, handle_outliers, encode_categorical_columns, balance_data
 
 # Constants for constraints to avoid using floating-point numbers directly in the code
 THETA_DC = 2           # Maximum number of selectors allowed
 THETA_CC = 2           # Minimum coverage required for the subgroup
 THETA_MAX_RATIO = 0.5  # Maximum ratio of cases that can be included in the subgroup
 
-def load_and_preprocess_data(file_path, categorical_columns, target_column, outlier_columns, balance_method='oversample', outlier_method='z-score'):
+def load_and_preprocess_data(file_path):
     """
     Load and preprocess dataset by handling missing values, encoding categorical variables, 
     balancing data, and handling outliers.
@@ -30,18 +30,18 @@ def load_and_preprocess_data(file_path, categorical_columns, target_column, outl
     df = load_data(file_path)
 
     # Step 2: Handle Missing Values
-    df = handle_missing_values(df, method='ffill')
+    #df = handle_missing_values(df, method='ffill')
 
     # Step 3: Encode Categorical Variables
-    df, label_encoders = encode_categorical_columns(df, categorical_columns)
+    #df, label_encoders = encode_categorical_columns(df, categorical_columns)
 
     # Step 4: Handle Outliers
-    df = handle_outliers(df, outlier_columns, method=outlier_method)
+    #df = handle_outliers(df, outlier_columns, method=outlier_method)
 
     # Step 5: Balance Data
-    df = balance_data(df, target_column, method=balance_method)
+    #df = balance_data(df, target_column, method=balance_method)
 
-    return df, label_encoders
+    return df
 
 
 def define_selectors(data):
@@ -173,7 +173,7 @@ def main(file_path):
         file_path (str): Path to the CSV file.
     """
     # Step 1: Load and preprocess data using functions from preprocess_data.py
-    data, label_encoders = load_and_preprocess_data(file_path)
+    data = load_and_preprocess_data(file_path)
     
     # Step 2: Define selectors
     selectors = define_selectors(data)

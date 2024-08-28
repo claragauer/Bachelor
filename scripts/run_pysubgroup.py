@@ -1,13 +1,13 @@
 import pysubgroup as ps
 import pandas as pd
 import os
-from scripts.preprocess_data import preprocess_data_low_level
+from scripts.preprocess_data import load_data
 # Constants
 TARGET_VALUE = 1
 
-def preprocess_data(file_path):
+def load_and_preprocess_data(file_path):
     """
-    Load and preprocess the data using a lower-level preprocessing function.
+    Load and preprocess the data.
 
     Parameters:
         file_path (str): Path to the CSV file.
@@ -16,11 +16,13 @@ def preprocess_data(file_path):
         pd.DataFrame: Preprocessed DataFrame.
         dict: Dictionary of LabelEncoders.
     """
-    # Call the lower-level preprocess data function
-    df= preprocess_data_low_level(file_path)
-
-    # Return the preprocessed DataFrame and label encoders
-    return df
+    try:
+        df = pd.read_csv(file_path)
+        print("Data loaded successfully.")
+        return df
+    except Exception as e:
+        print(f"An error occurred while loading data: {e}")
+        return None
 
 
 def define_target(df):
@@ -115,8 +117,8 @@ def main(file_path):
     Parameters:
         file_path (str): Path to the CSV file.
     """
-    # Load and preprocess data
-    df = preprocess_data(file_path)
+    # Load data
+    df = load_and_preprocess_data(file_path)
 
     # Define target for subgroup discovery
     target = define_target(df)
