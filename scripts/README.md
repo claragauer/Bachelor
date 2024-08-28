@@ -1,8 +1,8 @@
-Repository Structure
+# Repository Structure
 
-run_pysubgroup.py: Implements Subgroup Discovery using PySubgroup.
-run_gurobi.py: Implements Subgroup Discovery using Gurobi optimization solver.
-preprocess_data.py: Contains data preprocessing functions like loading data, handling missing values, and handling outliers.
+- run_pysubgroup.py: Implements Subgroup Discovery using PySubgroup.
+- run_gurobi.py: Implements Subgroup Discovery using Gurobi optimization solver.
+- preprocess_data.py: Contains data preprocessing functions like loading data, handling missing values, and handling outliers.
 
 # Difference between create_search_space and define_selectors
 
