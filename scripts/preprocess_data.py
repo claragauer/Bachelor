@@ -112,10 +112,8 @@ def handle_outliers(df, columns=None, method='z-score', threshold=1.5):
     if method == 'z-score':
         # Calculate z-scores for each column independently
         z_scores = df[columns].apply(zscore)  # Compute z-scores for each column
-        print("Z-scores calculated for each column:\n", z_scores)  # Debugging: Check z-scores
         # Keep rows where all columns are within the threshold
         df_no_outliers = df[(z_scores.abs() < threshold).all(axis=1)]
-        print("Rows retained after z-score filtering:\n", df_no_outliers)  # Debugging: Check retained rows
     else:
         raise ValueError("Invalid method. Use 'z-score' or 'iqr'.")
 

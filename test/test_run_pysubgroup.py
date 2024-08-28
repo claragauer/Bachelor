@@ -118,7 +118,7 @@ def test_handle_outliers():
     # CG : hier sieht man ganz klar den Nachteil der ZScore Methode. 
     # Der Wert -20 wird nicht rausgenommen, dafür bräuchte man vmtl noch zusätzlich IQR
     assert result2.equals(expected_result2), "Test 2 Failed: Outliers not removed correctly for z-score"
-
+    print("--------------------------------------------")
     print("OUTLIERS WITH Z-SCORE: All tests passed!")
 
 
