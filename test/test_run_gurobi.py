@@ -93,7 +93,6 @@ def test_missing_values_in_test_files():
 
 if __name__ == '__main__':
     # Specify the tests you want to run by passing a list of filenames.
-    test_pipeline(selected_tests=['test7missing.csv', 'test8missing.csv', 'test10missing.csv', 'test9missing.csv'])
     test_missing_values_in_test_files()
 
     # To run all tests, call without arguments:

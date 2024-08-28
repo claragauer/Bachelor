@@ -2,7 +2,7 @@ import os
 import sys
 import pandas as pd
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts.run_pysubgroup import main, load_and_preprocess_data
+from scripts.run_pysubgroup import main, load_and_preprocess_data, handle_outliers
 
 def test_pipeline(selected_tests=None):
     """
@@ -89,14 +89,44 @@ def test_missing_values_in_test_files():
 
         # Check for missing values
         check_missing_values(df)
+    
+def test_handle_outliers():
+    """
+    Test function to check outlier removal using load_and_preprocess_data.
+    """
+    # Directory containing the CSV files
+    data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../test/test_data/'))
 
-if __name__ == '__main__':
-    test_missing_values_in_test_files()
+    # Test File 1: Simple Outlier in Label
+    file_path1 = os.path.join(data_dir, 'test11outlier.csv')
+    result1 = load_and_preprocess_data(file_path1)
+    expected_result1 = pd.DataFrame({
+        'Color': ['Red', 'Red', 'Blue', 'Green'],
+        'Shape': ['Circle', 'Square', 'Circle', 'Circle'],
+        'Label': [1, 1, 2, 2]
+    })
+    assert result1.equals(expected_result1), "Test 1 Failed: Outlier not removed correctly for z-score method"
+
+    # Test File 2: Multiple Outliers in Label
+    file_path2 = os.path.join(data_dir, 'test12outlier.csv')
+    result2 = load_and_preprocess_data(file_path2)
+    expected_result2 = pd.DataFrame({
+        'Color': ['Red', 'Red', 'Blue', 'Blue', 'Yellow'],
+        'Shape': ['Circle', 'Square', 'Circle', 'Square', 'Circle'],
+        'Label': [1, -20, 3, 4, 3]
+    }).reset_index(drop=True)
+    # CG : hier sieht man ganz klar den Nachteil der ZScore Methode. 
+    # Der Wert -20 wird nicht rausgenommen, dafür bräuchte man vmtl noch zusätzlich IQR
+    assert result2.equals(expected_result2), "Test 2 Failed: Outliers not removed correctly for z-score"
+
+    print("OUTLIERS WITH Z-SCORE: All tests passed!")
+
 
 if __name__ == '__main__':
     # Specify the tests you want to run by passing a list of filenames.
-    test_pipeline(selected_tests=['test10encodeMissing.csv', 'test9encodeMissing.csv'])
+    
     test_missing_values_in_test_files()
+    test_handle_outliers()
 
     # To run all tests, call without arguments:
     #test_pipeline()

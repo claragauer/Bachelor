@@ -1,7 +1,7 @@
 import pysubgroup as ps
 import pandas as pd
 import os
-from scripts.preprocess_data import load_data, handle_missing_values
+from scripts.preprocess_data import load_data, handle_missing_values, handle_outliers
 # Constants
 TARGET_VALUE = 1
 
@@ -26,7 +26,7 @@ def load_and_preprocess_data(file_path):
     #df, label_encoders = encode_categorical_columns(df, categorical_columns)
 
     # Step 4: Handle Outliers
-    #df = handle_outliers(df, outlier_columns, method=outlier_method)
+    df = handle_outliers(df, method='z-score') # evtl methode spezifizieren
 
     # Step 5: Balance Data
     #df = balance_data(df, target_column, method=balance_method)

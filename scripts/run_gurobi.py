@@ -36,7 +36,7 @@ def load_and_preprocess_data(file_path):
     #df, label_encoders = encode_categorical_columns(df, categorical_columns)
 
     # Step 4: Handle Outliers
-    #df = handle_outliers(df, outlier_columns, method=outlier_method)
+    df = handle_outliers(df, method='z-score') # evtl noch method spezifizieren
 
     # Step 5: Balance Data
     #df = balance_data(df, target_column, method=balance_method)

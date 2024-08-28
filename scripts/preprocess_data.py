@@ -91,29 +91,36 @@ def balance_data(df, target, method='oversample'):
     return df_balanced
 
 
-def handle_outliers(df, columns, method='z-score', threshold=Z_SCORE_THRESHOLD):
+def handle_outliers(df, columns=None, method='z-score', threshold=1.5):
     """
     Handle outliers in the dataset.
 
     Parameters:
         df (pd.DataFrame): The DataFrame to process.
-        columns (list): List of columns to check for outliers.
+        columns (list, optional): List of columns to check for outliers. If None, all numeric columns are checked.
         method (str): Method to handle outliers ('z-score' or 'iqr').
-        threshold (float): Threshold for identifying outliers.
+        threshold (float): Threshold for identifying outliers (used with z-score).
+        iqr_multiplier (float): Multiplier for IQR to define outlier range (used with IQR method).
         
     Returns:
         pd.DataFrame: DataFrame with outliers removed.
     """
+    # Use all numeric columns if no columns are specified
+    if columns is None:
+        columns = df.select_dtypes(include=[float, int]).columns
+
     if method == 'z-score':
-        z_scores = zscore(df[columns].dropna())  # Compute z-scores, ignoring NaNs
-        return df[(z_scores < threshold).all(axis=1)]  # Remove outliers using Z-score
-    elif method == 'iqr':
-        Q1 = df[columns].quantile(0.25)
-        Q3 = df[columns].quantile(0.75)
-        IQR = Q3 - Q1
-        return df[~((df[columns] < (Q1 - IQR_MULTIPLIER * IQR)) | (df[columns] > (Q3 + IQR_MULTIPLIER * IQR))).any(axis=1)]  # Remove outliers using IQR
+        # Calculate z-scores for each column independently
+        z_scores = df[columns].apply(zscore)  # Compute z-scores for each column
+        print("Z-scores calculated for each column:\n", z_scores)  # Debugging: Check z-scores
+        # Keep rows where all columns are within the threshold
+        df_no_outliers = df[(z_scores.abs() < threshold).all(axis=1)]
+        print("Rows retained after z-score filtering:\n", df_no_outliers)  # Debugging: Check retained rows
     else:
         raise ValueError("Invalid method. Use 'z-score' or 'iqr'.")
+
+    # Reset the index to ensure proper comparison
+    return df_no_outliers.reset_index(drop=True)
 
 
 def preprocess_data_low_level(file_path):
