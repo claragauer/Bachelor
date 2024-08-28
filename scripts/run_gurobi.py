@@ -9,39 +9,27 @@ THETA_DC = 2           # Maximum number of selectors allowed
 THETA_CC = 2           # Minimum coverage required for the subgroup
 THETA_MAX_RATIO = 0.5  # Maximum ratio of cases that can be included in the subgroup
 
+MAXIMUM_UNIQUE_VALUES = 5 # Maximum number of unique numbers allowed in order to create selectors.
+
 def load_and_preprocess_data(file_path):
     """
-    Load and preprocess dataset by handling missing values, encoding categorical variables, 
-    balancing data, and handling outliers.
+    Load and preprocess dataset by handling missing values and handling outliers.
     
     Parameters:
         file_path (str): Path to the CSV file.
-        categorical_columns (list): List of categorical columns to encode.
-        target_column (str): Name of the target column for balancing.
-        outlier_columns (list): List of columns to check for outliers.
-        balance_method (str): Method for balancing data ('oversample' or 'undersample').
-        outlier_method (str): Method to handle outliers ('z-score' or 'iqr').
         
     Returns:
         pd.DataFrame: Preprocessed DataFrame.
         dict: Dictionary of LabelEncoders used for encoding categorical columns.
     """
-    # Step 1: Load dataset
-    df = load_data(file_path)
-
-    # Step 2: Handle Missing Values
-    df = handle_missing_values(df, method='ffill')
-
-    # Step 3: Encode Categorical Variables
-    #df, label_encoders = encode_categorical_columns(df, categorical_columns)
-
-    # Step 4: Handle Outliers
-    df = handle_outliers(df, method='z-score') # evtl noch method spezifizieren
-
-    # Step 5: Balance Data
-    #df = balance_data(df, target_column, method=balance_method)
-
-    return df
+    try:
+        df = load_data(file_path)
+        df = handle_missing_values(df)
+        df = handle_outliers(df)
+        return df
+    except Exception as e:
+        print(f"Error during preprocessing: {e}")
+        raise
 
 
 def define_selectors(data):
@@ -51,17 +39,29 @@ def define_selectors(data):
     
     Parameters:
         data (pd.DataFrame): The preprocessed DataFrame.
+        conditions (dict): Dictionary with column names as keys and lists of values as conditions.
         
     Returns:
         dict: Dictionary of binary selectors, where each key is a condition and each value is a binary vector.
     """
-    selectors = {
-        'Color_Red': (data['Color'] == 'Red').astype(int),
-        'Color_Blue': (data['Color'] == 'Blue').astype(int),
-        'Shape_Circle': (data['Shape'] == 'Circle').astype(int),
-        'Shape_Square': (data['Shape'] == 'Square').astype(int)
-    }
+
+    selectors = {} # Initialize an empty dictionary to store selectors
+    
+    # Iterate over each column in the data frame to create selectors based on unique values
+    for column in data.columns:
+        unique_values = data[column].unique() # Get all unique values in the column 
+        # Create selectors only for columns with a manageable number of unique values to avoid excessive computation.
+        if len(unique_values) <= MAXIMUM_UNIQUE_VALUES:  
+            # Iterate over each unique value to create a corresponding binary selector
+            for value in unique_values:
+                # Create unique selector name by combining the column and the value 
+                selector_name = f"{column}_{value}"
+                selectors[selector_name] = (data[column] == value).astype(int)
+        else:
+            print(f"Skipping column '{column}' due to too many unique values ({len(unique_values)}).")
+
     return selectors
+
 
 def setup_model(n_cases, selectors):
     """
@@ -110,14 +110,14 @@ def add_constraints(model, n_cases, selectors, T, D):
         D (gp.tupledict): Decision variables D.
     """
     # Maximum number of selectors used
-    model.addConstr(gp.quicksum(D[i] for i in range(len(selectors))) <= THETA_DC)
+    model.addConstr(gp.quicksum(D[i] for i in range(len(selectors))) <= THETA_DC, "MaximumNumberSelectors")
 
     # Minimum number of cases in the subgroup
-    model.addConstr(gp.quicksum(T[c] for c in range(n_cases)) >= THETA_CC)
+    model.addConstr(gp.quicksum(T[c] for c in range(n_cases)) >= THETA_CC, "MinimumCasesSubgroup")
 
     # Maximum size of the subgroup (as a proportion of total cases)
     theta_max = int(THETA_MAX_RATIO * n_cases)
-    model.addConstr(gp.quicksum(T[c] for c in range(n_cases)) <= theta_max)
+    model.addConstr(gp.quicksum(T[c] for c in range(n_cases)) <= theta_max, "MaximumSizeSubgroup")
 
     # Ensure subgroup is not empty
     model.addConstr(gp.quicksum(T[c] for c in range(n_cases)) >= 1, "NonEmptySubset")
@@ -172,21 +172,15 @@ def main(file_path):
     Parameters:
         file_path (str): Path to the CSV file.
     """
-    # Step 1: Load and preprocess data using functions from preprocess_data.py
-    data = load_and_preprocess_data(file_path)
-    
-    # Step 2: Define selectors
-    selectors = define_selectors(data)
-    n_cases = len(data)  # Number of cases
-    
-    # Step 3: Setup Gurobi model
-    model, T, D, PosRatio = setup_model(n_cases, selectors)
-    
-    # Step 4: Set objective function and constraints
-    set_objective(model, T, PosRatio, data, n_cases)
-    
-    # Step 5: Run optimization
-    run_optimization(model)
+    try:
+        data = load_and_preprocess_data(file_path)
+        selectors = define_selectors(data)
+        n_cases = len(data)
+        model, T, D, PosRatio = setup_model(n_cases, selectors)
+        set_objective(model, T, PosRatio, data, n_cases)
+        run_optimization(model)
+    except Exception as e:
+        print(f"An error occurred during the optimization process: {e}")
 
 
 
