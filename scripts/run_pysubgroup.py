@@ -2,8 +2,11 @@ import pysubgroup as ps
 import pandas as pd
 import os
 from scripts.preprocess_data import load_data, handle_missing_values, handle_outliers
+
 # Constants
 TARGET_VALUE = 1
+RESULT_SET_SIZE = 5
+SEARCH_DEPTH = 2
 
 def load_and_preprocess_data(file_path):
     """
@@ -16,21 +19,14 @@ def load_and_preprocess_data(file_path):
         pd.DataFrame: Preprocessed DataFrame.
         dict: Dictionary of LabelEncoders.
     """
-    # Step 1: Load dataset
-    df = load_data(file_path)
-
-    # Step 2: Handle Missing Values
-    df = handle_missing_values(df, method='ffill')
-
-    # Step 3: Encode Categorical Variables
-    #df, label_encoders = encode_categorical_columns(df, categorical_columns)
-
-    # Step 4: Handle Outliers
-    df = handle_outliers(df, method='z-score') # evtl methode spezifizieren
-
-    # Step 5: Balance Data
-    #df = balance_data(df, target_column, method=balance_method)
-    return df
+    try:
+        df = load_data(file_path)
+        df = handle_missing_values(df)
+        df = handle_outliers(df)
+        return df
+    except Exception as e:
+        print(f"Error during preprocessing: {e}")
+        raise
 
 
 def define_target(df):
@@ -44,24 +40,21 @@ def define_target(df):
         ps.BinaryTarget: The target for subgroup discovery.
     """
     # Define the target variable. 'Label' is the target column with binary values.
-    target = ps.BinaryTarget('Label', TARGET_VALUE)
-    print(target)
+    target = ps.BinaryTarget('Label', TARGET_VALUE) # CG: Achtung hardkodiert hier
     return target
-
-def create_search_space():
-    """
-    Create the search space for subgroup discovery.
     
+
+def create_search_space(columns):
+    """
+    Create the search space for subgroup discovery based on specified columns and values.
+    
+    Parameters:
+        columns (list): List of tuples containing column names and values to create selectors for.
+        
     Returns:
         list: List of possible selectors for subgroup discovery.
     """
-    search_space = [
-        ps.EqualitySelector('Color', 'Red'),
-        ps.EqualitySelector('Color', 'Blue'),
-        ps.EqualitySelector('Shape', 'Circle'),
-        ps.EqualitySelector('Shape', 'Square')
-    ]
-    return search_space
+    return [ps.EqualitySelector(col, val) for col, val in columns]
 
 def run_subgroup_discovery(df, target, search_space):
     """
@@ -86,8 +79,8 @@ def run_subgroup_discovery(df, target, search_space):
         df, 
         target, 
         search_space, 
-        result_set_size=5, 
-        depth=2, 
+        result_set_size=RESULT_SET_SIZE, 
+        depth=SEARCH_DEPTH, 
         qf=quality_function)
 
     # Execute the algorithm
@@ -125,20 +118,14 @@ def main(file_path):
     Parameters:
         file_path (str): Path to the CSV file.
     """
-    # Load data
-    df = load_and_preprocess_data(file_path)
-
-    # Define target for subgroup discovery
-    target = define_target(df)
-    
-    # Create search space for subgroup discovery
-    search_space = create_search_space()
-    
-    # Run subgroup discovery
-    result_df = run_subgroup_discovery(df, target, search_space)
-    
-    # Display results
-    display_results(result_df)
+    try:
+        df = load_and_preprocess_data(file_path)
+        target = define_target(df)
+        search_space = create_search_space([('Color', 'Red'), ('Color', 'Blue'), ('Shape', 'Circle'), ('Shape', 'Square')])
+        result_df = run_subgroup_discovery(df, target, search_space)
+        display_results(result_df)
+    except Exception as e:
+        print(f"An error occurred during the main execution: {e}")
 
 if __name__ == "__main__":
     main()
