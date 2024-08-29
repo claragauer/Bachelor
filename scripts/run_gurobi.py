@@ -3,6 +3,7 @@ from gurobipy import GRB
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 from scripts.preprocess_data import load_data, handle_missing_values, handle_outliers, encode_categorical_columns, balance_data
+from scripts.evaluate_models import measure_memory_usage
 
 # Constants for constraints to avoid using floating-point numbers directly in the code
 THETA_DC = 2           # Maximum number of selectors allowed
@@ -173,12 +174,18 @@ def main(file_path):
         file_path (str): Path to the CSV file.
     """
     try:
-        data = load_and_preprocess_data(file_path)
-        selectors = define_selectors(data)
-        n_cases = len(data)
-        model, T, D, PosRatio = setup_model(n_cases, selectors)
-        set_objective(model, T, PosRatio, data, n_cases)
-        run_optimization(model)
+        def run_optimization_pipeline(file_path):
+            data = load_and_preprocess_data(file_path)
+            selectors = define_selectors(data)
+            n_cases = len(data)
+            model, T, D, PosRatio = setup_model(n_cases, selectors)
+            set_objective(model, T, PosRatio, data, n_cases)
+            run_optimization(model)
+
+        # Measure memory usage during the complete pipeline
+        _, peak_memory = measure_memory_usage(run_optimization_pipeline, file_path)
+
+        print(f"The peak memory usage during the optimization for {file_path} was: {peak_memory:.2f} MB")
     except Exception as e:
         print(f"An error occurred during the optimization process: {e}")
 

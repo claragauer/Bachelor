@@ -2,7 +2,7 @@ import pysubgroup as ps
 import pandas as pd
 import os
 from scripts.preprocess_data import load_data, handle_missing_values, handle_outliers
-
+from scripts.evaluate_models import measure_memory_usage
 # Constants
 TARGET_VALUE = 1
 RESULT_SET_SIZE = 5
@@ -119,11 +119,17 @@ def main(file_path):
         file_path (str): Path to the CSV file.
     """
     try:
-        df = load_and_preprocess_data(file_path)
-        target = define_target(df)
-        search_space = create_search_space([('Color', 'Red'), ('Color', 'Blue'), ('Shape', 'Circle'), ('Shape', 'Square')])
-        result_df = run_subgroup_discovery(df, target, search_space)
-        display_results(result_df)
+        def run_optimization_pipeline(file_path):
+            df = load_and_preprocess_data(file_path)
+            target = define_target(df)
+            search_space = create_search_space([('Color', 'Red'), ('Color', 'Blue'), ('Shape', 'Circle'), ('Shape', 'Square')])
+            result_df = run_subgroup_discovery(df, target, search_space)
+            display_results(result_df)
+
+            # Measure memory usage during the complete pipeline
+            _, peak_memory = measure_memory_usage(run_optimization_pipeline, file_path)
+
+            print(f"The peak memory usage during the optimization for {file_path} was: {peak_memory:.2f} MB")
     except Exception as e:
         print(f"An error occurred during the main execution: {e}")
 

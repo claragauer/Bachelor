@@ -126,7 +126,7 @@ if __name__ == '__main__':
     # Specify the tests you want to run by passing a list of filenames.
     
     #test_missing_values_in_test_files()
-    test_handle_outliers()
+    #test_handle_outliers()
 
     # To run all tests, call without arguments:
     test_pipeline()
