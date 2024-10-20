@@ -1,32 +1,32 @@
-Lage;Zeitpunkt der Messung;Wochentag;Fußgänger insgesamt;Temperatur;Wetterlage;Fußgänger insgesamt Richtung Neumarkt;Fußgänger insgesamt Richtung Neuer Wall;Erwachsene;Kinder;Erwachsene Richtung Neumarkt;Erwachsene Richtung Neuer Wall;Kinder Richtung Neumarkt;Kinder Richtung Neuer Wall
-Steinstraße, Moers;2022-07-01 00:00:00 +0200;Friday;16430;23;rain;8237;8193;15813;617;7902;7911;335;282
-Steinstraße, Moers;2022-07-02 00:00:00 +0200;Saturday;15870;27;partly-cloudy-day;8096;7774;15266;604;7745;7521;351;253
-Steinstraße, Moers;2022-07-03 00:00:00 +0200;Sunday;3907;27;partly-cloudy-day;2004;1903;3766;141;1929;1837;75;66
-Steinstraße, Moers;2022-07-04 00:00:00 +0200;Monday;14052;26;clear-day;7146;6906;13471;581;6822;6649;324;257
-Steinstraße, Moers;2022-07-05 00:00:00 +0200;Tuesday;15251;25;partly-cloudy-day;7751;7500;14587;664;7403;7184;348;316
-Steinstraße, Moers;2022-07-06 00:00:00 +0200;Wednesday;13746;23;partly-cloudy-day;6951;6795;13209;537;6660;6549;291;246
-Steinstraße, Moers;2022-07-07 00:00:00 +0200;Thursday;11998;21;rain;6004;5994;11545;453;5757;5788;247;206
-Steinstraße, Moers;2022-07-08 00:00:00 +0200;Friday;17853;25;partly-cloudy-day;9137;8716;17094;759;8737;8357;400;359
-Steinstraße, Moers;2022-07-09 00:00:00 +0200;Saturday;17328;25;partly-cloudy-day;9002;8326;16647;681;8605;8042;397;284
-Steinstraße, Moers;2022-07-10 00:00:00 +0200;Sunday;4677;22;partly-cloudy-day;2442;2235;4484;193;2329;2155;113;80
-Steinstraße, Moers;2022-07-11 00:00:00 +0200;Monday;13643;24;partly-cloudy-day;6869;6774;13120;523;6556;6564;313;210
-Steinstraße, Moers;2022-07-12 00:00:00 +0200;Tuesday;14785;29;partly-cloudy-day;7439;7346;14170;615;7096;7074;343;272
-Steinstraße, Moers;2022-07-13 00:00:00 +0200;Wednesday;11856;30;partly-cloudy-day;5921;5935;11323;533;5620;5703;301;232
-Steinstraße, Moers;2022-07-14 00:00:00 +0200;Thursday;13143;26;partly-cloudy-day;6581;6562;12576;567;6279;6297;302;265
-Steinstraße, Moers;2022-07-15 00:00:00 +0200;Friday;15734;24;partly-cloudy-day;7875;7859;15087;647;7519;7568;356;291
-Steinstraße, Moers;2022-07-16 00:00:00 +0200;Saturday;15813;24;partly-cloudy-day;8037;7776;15250;563;7720;7530;317;246
-Steinstraße, Moers;2022-07-17 00:00:00 +0200;Sunday;27673;28;partly-cloudy-day;13773;13900;26722;951;13259;13463;514;437
-Steinstraße, Moers;2022-07-18 00:00:00 +0200;Monday;10293;35;partly-cloudy-day;5234;5059;9914;379;5031;4883;203;176
-Steinstraße, Moers;2022-07-19 00:00:00 +0200;Tuesday;7667;38;clear-day;3891;3776;7462;205;3781;3681;110;95
-Steinstraße, Moers;2022-07-20 00:00:00 +0200;Wednesday;10047;31;rain;5139;4908;9710;337;4945;4765;194;143
-Steinstraße, Moers;2022-07-21 00:00:00 +0200;Thursday;8091;21;rain;3980;4111;7846;245;3858;3988;122;123
-Steinstraße, Moers;2022-07-22 00:00:00 +0200;Friday;15545;24;partly-cloudy-day;7764;7781;14887;658;7417;7470;347;311
-Steinstraße, Moers;2022-07-23 00:00:00 +0200;Saturday;13896;27;partly-cloudy-day;6998;6898;13389;507;6717;6672;281;226
-Steinstraße, Moers;2022-07-24 00:00:00 +0200;Sunday;3088;32;partly-cloudy-day;1620;1468;2983;105;1558;1425;62;43
-Steinstraße, Moers;2022-07-25 00:00:00 +0200;Monday;12040;30;partly-cloudy-day;6170;5870;11554;486;5889;5665;281;205
-Steinstraße, Moers;2022-07-26 00:00:00 +0200;Tuesday;13616;22;partly-cloudy-day;6839;6777;13115;501;6565;6550;274;227
-Steinstraße, Moers;2022-07-27 00:00:00 +0200;Wednesday;14104;23;partly-cloudy-day;7059;7045;13460;644;6718;6742;341;303
-Steinstraße, Moers;2022-07-28 00:00:00 +0200;Thursday;14440;26;partly-cloudy-day;7279;7161;13851;589;6962;6889;317;272
-Steinstraße, Moers;2022-07-29 00:00:00 +0200;Friday;14873;27;rain;7476;7397;14340;533;7193;7147;283;250
-Steinstraße, Moers;2022-07-30 00:00:00 +0200;Saturday;16063;27;partly-cloudy-day;8160;7903;15440;623;7832;7608;328;295
-Steinstraße, Moers;2022-07-31 00:00:00 +0200;Sunday;3077;27;rain;1542;1535;2947;130;1475;1472;67;63
+Fußgänger insgesamt,Temperatur,Wetterlage
+16430,23,rain
+15870,27,partly-cloudy-day
+3907,27,partly-cloudy-day
+14052,26,clear-day
+15251,25,partly-cloudy-day
+13746,23,partly-cloudy-day
+11998,21,rain
+17853,25,partly-cloudy-day
+17328,25,partly-cloudy-day
+4677,22,partly-cloudy-day
+13643,24,partly-cloudy-day
+14785,29,partly-cloudy-day
+11856,30,partly-cloudy-day
+13143,26,partly-cloudy-day
+15734,24,partly-cloudy-day
+15813,24,partly-cloudy-day
+27673,28,partly-cloudy-day
+10293,35,partly-cloudy-day
+7667,38,clear-day
+10047,31,rain
+8091,21,rain
+15545,24,partly-cloudy-day
+13896,27,partly-cloudy-day
+3088,32,partly-cloudy-day
+12040,30,partly-cloudy-day
+13616,22,partly-cloudy-day
+14104,23,partly-cloudy-day
+14440,26,partly-cloudy-day
+14873,27,rain
+16063,27,partly-cloudy-day
+3077,27,rain

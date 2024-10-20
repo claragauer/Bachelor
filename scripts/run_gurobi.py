@@ -152,7 +152,6 @@ def set_objective(model, T, PosRatio, data, n_cases):
     """
     # Calculate the proportion of positive cases in the dataset
     positives_dataset = (
-        (data['Temperatur'] > 25) &
         (data['Wetterlage'] == 'rain') &
         (data['Fußgänger insgesamt'] > 10000)
     ).astype(int).tolist()
@@ -194,18 +193,6 @@ def main(file_path):
     try:
         def run_optimization_pipeline(file_path):
             data = load_and_preprocess_data(file_path)
-            
-        # Zeige alle Spaltennamen an, um zu prüfen, ob 'Temperatur' vorhanden ist
-            print(f"Spaltennamen: {data.columns}")
-
-            # Prüfe, ob die Spalte 'Temperatur' in den Spalten vorhanden ist
-            if 'Temperatur' in data.columns:
-                print(data['Temperatur'].head())
-                print(data['Temperatur'].isnull().sum())
-                print(data['Temperatur'].dtype)
-            else:
-                raise ValueError("Spalte 'Temperatur' nicht g")        
-        
             selectors = define_selectors(data)  # Define selectors based on the sampled data
             n_cases = len(data)  # Get number of cases in the sampled data
     
