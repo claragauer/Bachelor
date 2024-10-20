@@ -1,16 +1,24 @@
 import gurobipy as gp
 from gurobipy import GRB
 import pandas as pd
+import sys
+import os
+# Get the directory of the current script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Add the 'Bachelor' directory to the sys.path
+sys.path.append(os.path.join(current_dir, 'scripts'))
+
 from sklearn.preprocessing import LabelEncoder
-from scripts.preprocess_data import load_data, handle_missing_values, handle_outliers, encode_categorical_columns, balance_data
-from scripts.evaluate_models import measure_memory_usage
+from preprocess_data import load_data, handle_missing_values, handle_outliers, encode_categorical_columns, balance_data
+from evaluate_models import measure_memory_usage
 
 # Constants for constraints to avoid using floating-point numbers directly in the code
 THETA_DC = 2           # Maximum number of selectors allowed
 THETA_CC = 2           # Minimum coverage required for the subgroup
 THETA_MAX_RATIO = 0.5  # Maximum ratio of cases that can be included in the subgroup
 
-MAXIMUM_UNIQUE_VALUES = 5 # Maximum number of unique numbers allowed in order to create selectors.
+MAXIMUM_UNIQUE_VALUES = 40 # Maximum number of unique numbers allowed in order to create selectors.
 
 def load_and_preprocess_data(file_path):
     """
@@ -25,8 +33,11 @@ def load_and_preprocess_data(file_path):
     """
     try:
         df = load_data(file_path)
-        df = handle_missing_values(df)
-        df = handle_outliers(df)
+        #df = handle_missing_values(df)
+        #df = handle_outliers(df)
+        #if isinstance(df, pd.Series):
+        #    print("Warning: df is a Series, converting to DataFrame")
+        #df = df.to_frame()
         return df
     except Exception as e:
         print(f"Error during preprocessing: {e}")
@@ -91,7 +102,7 @@ def setup_model(n_cases, selectors):
     for i, (selector_name, selector_values) in enumerate(selectors.items()):
         for c in range(n_cases):
             # Ensures that if a selector is active, all matching cases must be in the subgroup
-            model.addConstr(T[c] >= D[i] * selector_values[c])
+            model.addConstr(T[c] >= D[i] * selector_values.iloc[c]) # C1
 
     # Add complexity, coverage, and other constraints
     add_constraints(model, n_cases, selectors, T, D)
@@ -126,6 +137,8 @@ def add_constraints(model, n_cases, selectors, T, D):
     # Ensure at least one selector is active in the subgroup description
     model.addConstr(gp.quicksum(D[i] for i in range(len(selectors))) >= 1, "AtLeastOneSelector")
 
+    # Angleichen von 
+
 def set_objective(model, T, PosRatio, data, n_cases):
     """
     Define the objective function for the Gurobi model to maximize the Weighted Relative Accuracy (WRAcc) of the subgroup.
@@ -138,7 +151,11 @@ def set_objective(model, T, PosRatio, data, n_cases):
         n_cases (int): Number of cases.
     """
     # Calculate the proportion of positive cases in the dataset
-    positives_dataset = data['Label'].tolist()
+    positives_dataset = (
+        (data['Temperatur'] > 25) &
+        (data['Wetterlage'] == 'rain') &
+        (data['Fußgänger insgesamt'] > 10000)
+    ).astype(int).tolist()
     target_share_dataset = sum(positives_dataset) / n_cases
 
     # Define subgroup size and positive count within the subgroup
@@ -160,6 +177,7 @@ def run_optimization(model):
         model (gp.Model): Gurobi model.
     """
     model.optimize()
+    model.write("model.lp")
     if model.status == GRB.OPTIMAL:
         print("Optimal solution found:")
     else:
@@ -176,11 +194,25 @@ def main(file_path):
     try:
         def run_optimization_pipeline(file_path):
             data = load_and_preprocess_data(file_path)
-            selectors = define_selectors(data)
-            n_cases = len(data)
+            
+        # Zeige alle Spaltennamen an, um zu prüfen, ob 'Temperatur' vorhanden ist
+            print(f"Spaltennamen: {data.columns}")
+
+            # Prüfe, ob die Spalte 'Temperatur' in den Spalten vorhanden ist
+            if 'Temperatur' in data.columns:
+                print(data['Temperatur'].head())
+                print(data['Temperatur'].isnull().sum())
+                print(data['Temperatur'].dtype)
+            else:
+                raise ValueError("Spalte 'Temperatur' nicht g")        
+        
+            selectors = define_selectors(data)  # Define selectors based on the sampled data
+            n_cases = len(data)  # Get number of cases in the sampled data
+    
             model, T, D, PosRatio = setup_model(n_cases, selectors)
             set_objective(model, T, PosRatio, data, n_cases)
             run_optimization(model)
+        
 
         # Measure memory usage during the complete pipeline
         _, peak_memory = measure_memory_usage(run_optimization_pipeline, file_path)
@@ -189,7 +221,15 @@ def main(file_path):
     except Exception as e:
         print(f"An error occurred during the optimization process: {e}")
 
-
-
 if __name__ == "__main__":
-    main()
+    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/besucher.csv" 
+    main(file_path)  # Pass the file_path argument to main
+    
+
+
+#if model.status==3:
+ #       model.computeIIS()
+ #       model.write("infeasible_model.ilp")
+
+ #https://www.gurobi.com/documentation/current/refman/py_model_addconstrs.html
+ #https://www.gurobi.com/documentation/current/refman/py_quicksum.html
