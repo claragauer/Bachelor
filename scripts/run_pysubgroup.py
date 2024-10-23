@@ -1,11 +1,20 @@
 import pysubgroup as ps
 import pandas as pd
 import os
-from scripts.preprocess_data import load_data, handle_missing_values, handle_outliers
-from scripts.evaluate_models import measure_memory_usage
+import sys
+import matplotlib.pyplot as plt
+
+# Get the directory of the current script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Add the 'Bachelor' directory to the sys.path
+sys.path.append(os.path.join(current_dir, 'scripts'))
+
+from preprocess_data import load_data, handle_missing_values, handle_outliers
+from evaluate_models import measure_memory_usage
 # Constants
 TARGET_VALUE = 1
-RESULT_SET_SIZE = 5
+RESULT_SET_SIZE = 3
 SEARCH_DEPTH = 2
 
 def load_and_preprocess_data(file_path):
@@ -39,8 +48,13 @@ def define_target(df):
     Returns:
         ps.BinaryTarget: The target for subgroup discovery.
     """
-    # Define the target variable. 'Label' is the target column with binary values.
-    target = ps.BinaryTarget('Label', TARGET_VALUE) # CG: Achtung hardkodiert hier
+    threshold = 10000
+    # Create a binary target based on whether pedestrian count exceeds the threshold
+    df['Binary_Pedestrian'] = (df['Fußgänger insgesamt'] > threshold).astype(int)
+    
+    # Define the binary target using the new column
+    target = ps.BinaryTarget('Binary_Pedestrian', 1)  # Target is 1 (true) if pedestrian count > threshold
+    
     return target
     
 
@@ -54,7 +68,18 @@ def create_search_space(columns):
     Returns:
         list: List of possible selectors for subgroup discovery.
     """
-    return [ps.EqualitySelector(col, val) for col, val in columns]
+    # NOTEX TO SELF: es gibt keinen Numeric Selector 
+    weather_conditions = ['rain', 'partly-cloudy-day', 'clear-day']
+    
+    # Create selectors for Wetterlage
+    search_space = [ps.EqualitySelector('Wetterlage', condition) for condition in weather_conditions]
+    
+    # Create selectors for temperature intervals
+    temperature_ranges = [(15, 25), (25, 35), (35, 45)]  # Example ranges
+    search_space += [ps.IntervalSelector('Temperatur', start, end) for start, end in temperature_ranges]
+    
+    return search_space
+    
 
 def run_subgroup_discovery(df, target, search_space):
     """
@@ -119,19 +144,53 @@ def main(file_path):
         file_path (str): Path to the CSV file.
     """
     try:
-        def run_optimization_pipeline(file_path):
+        
             df = load_and_preprocess_data(file_path)
             target = define_target(df)
-            search_space = create_search_space([('Color', 'Red'), ('Color', 'Blue'), ('Shape', 'Circle'), ('Shape', 'Square')])
+            search_space = create_search_space(df)
             result_df = run_subgroup_discovery(df, target, search_space)
-            display_results(result_df)
+             # Anzeige und Visualisierung der Ergebnisse
+            for i, row in result_df.iterrows():
+                print(f"Details of Subgroup {i}:")
+                print(row)
+                print(f"Conditions of Subgroup {i}: {row['subgroup']}")
+                print("-" * 40)
 
-            # Measure memory usage during the complete pipeline
-            _, peak_memory = measure_memory_usage(run_optimization_pipeline, file_path)
+                # Extrahiere die Bedingung und finde die Fälle, die diese Subgruppe erfüllen
+                subgroup_condition = row['subgroup']
+                
+                # Filter für die Subgruppe anwenden (subgroup_condition.covers(df) gibt die gefilterten Zeilen zurück)
+                positive_cases = df[subgroup_condition.covers(df)]
+                
+                # Visualisierung der Subgruppe
+                plt.figure(figsize=(10, 6))
 
-            print(f"The peak memory usage during the optimization for {file_path} was: {peak_memory:.2f} MB")
+                # Scatterplot für alle Daten (grau)
+                plt.scatter(df['Temperatur'], df['Fußgänger insgesamt'], color='gray', alpha=0.5, label='Alle Daten')
+
+                # Scatterplot für die positiven Fälle (blau)
+                plt.scatter(positive_cases['Temperatur'], positive_cases['Fußgänger insgesamt'], color='blue', label='Positive Fälle')
+
+                # Titel und Achsenbeschriftungen
+                plt.title(f'Subgroup {i}: Fußgängeranzahl vs. Temperatur')
+                plt.xlabel('Temperatur')
+                plt.ylabel('Fußgänger insgesamt')
+
+                # Legende
+                plt.legend()
+
+                # Plot anzeigen
+                plt.show()
+
+        # Speicherverbrauch messen
+        #_, peak_memory = measure_memory_usage(file_path)
+        #print(f"The peak memory usage during the optimization for {file_path} was: {peak_memory:.2f} MB")
+
     except Exception as e:
         print(f"An error occurred during the main execution: {e}")
 
 if __name__ == "__main__":
-    main()
+    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/besucher.csv" 
+    main(file_path)  # Pass the file_path argument to main
+    
+

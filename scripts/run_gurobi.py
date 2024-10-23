@@ -3,6 +3,7 @@ from gurobipy import GRB
 import pandas as pd
 import sys
 import os
+import matplotlib.pyplot as plt
 # Get the directory of the current script
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -18,7 +19,7 @@ THETA_DC = 2           # Maximum number of selectors allowed
 THETA_CC = 2           # Minimum coverage required for the subgroup
 THETA_MAX_RATIO = 0.5  # Maximum ratio of cases that can be included in the subgroup
 
-MAXIMUM_UNIQUE_VALUES = 40 # Maximum number of unique numbers allowed in order to create selectors.
+MAXIMUM_UNIQUE_VALUES = 85 # Maximum number of unique numbers allowed in order to create selectors.
 
 def load_and_preprocess_data(file_path):
     """
@@ -151,10 +152,14 @@ def set_objective(model, T, PosRatio, data, n_cases):
         n_cases (int): Number of cases.
     """
     # Calculate the proportion of positive cases in the dataset
+    # NOTEX TO SELF: Der Typ hat ein Problem mit Leerzeichen, wird da immer ein Fehler herausgeben 
     positives_dataset = (
-        (data['Wetterlage'] == 'rain') &
-        (data['Fußgänger insgesamt'] > 10000)
-    ).astype(int).tolist()
+    (data['Temperatur'] > 25) &  # Temperatur größer als 25 Grad
+    (data['Temperatur'] <= 30) &  # Temperatur kleiner oder gleich 30 Grad
+    (data['Wetterlage'] == 'partly-cloudy-day')  # Wetterlage: teilweise bewölkt
+        ).astype(int)
+
+
     target_share_dataset = sum(positives_dataset) / n_cases
 
     # Define subgroup size and positive count within the subgroup
@@ -177,6 +182,11 @@ def run_optimization(model):
     """
     model.optimize()
     model.write("model.lp")
+    if model.status == GRB.INFEASIBLE:
+                print("Model is infeasible. Computing IIS...")
+                model.computeIIS()
+                model.write("infeasible_model.ilp")
+
     if model.status == GRB.OPTIMAL:
         print("Optimal solution found:")
     else:
@@ -193,13 +203,40 @@ def main(file_path):
     try:
         def run_optimization_pipeline(file_path):
             data = load_and_preprocess_data(file_path)
+            print(data.columns)
             selectors = define_selectors(data)  # Define selectors based on the sampled data
             n_cases = len(data)  # Get number of cases in the sampled data
     
             model, T, D, PosRatio = setup_model(n_cases, selectors)
             set_objective(model, T, PosRatio, data, n_cases)
             run_optimization(model)
-        
+
+            # Subgruppe definieren: Wetterlage ist 'partly-cloudy-day' und Fußgängeranzahl > 10.000
+            positive_cases = data[(data['Wetterlage'] == 'partly-cloudy-day') & (data['Fußgänger insgesamt'] > 10000)]
+
+            # Ausgabe der Subgruppe
+            print(positive_cases)
+
+            # Visualisierung der Subgruppe
+            plt.figure(figsize=(10, 6))
+
+            # Scatterplot für alle Daten (grau)
+            plt.scatter(data['Temperatur'], data['Fußgänger insgesamt'], color='gray', alpha=0.5, label='Alle Daten')
+
+            # Scatterplot für die positiven Fälle (blau)
+            plt.scatter(positive_cases['Temperatur'], positive_cases['Fußgänger insgesamt'], color='blue', label='Positive Fälle')
+
+            # Titel und Achsenbeschriftungen
+            plt.title('Fußgängeranzahl vs. Temperatur (Positive Fälle: partly-cloudy-day & Fußgänger > 10000)')
+            plt.xlabel('Temperatur')
+            plt.ylabel('Fußgänger insgesamt')
+
+            # Legende
+            plt.legend()
+
+            # Plot anzeigen
+            plt.show()
+
 
         # Measure memory usage during the complete pipeline
         _, peak_memory = measure_memory_usage(run_optimization_pipeline, file_path)
