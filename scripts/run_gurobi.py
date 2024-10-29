@@ -19,7 +19,7 @@ THETA_DC = 2           # Maximum number of selectors allowed
 THETA_CC = 2           # Minimum coverage required for the subgroup
 THETA_MAX_RATIO = 0.5  # Maximum ratio of cases that can be included in the subgroup
 
-MAXIMUM_UNIQUE_VALUES = 85 # Maximum number of unique numbers allowed in order to create selectors.
+MAXIMUM_UNIQUE_VALUES = 1000 # Maximum number of unique numbers allowed in order to create selectors.
 
 def load_and_preprocess_data(file_path):
     """
@@ -33,12 +33,11 @@ def load_and_preprocess_data(file_path):
         dict: Dictionary of LabelEncoders used for encoding categorical columns.
     """
     try:
-        df = load_data(file_path)
-        #df = handle_missing_values(df)
-        #df = handle_outliers(df)
-        #if isinstance(df, pd.Series):
-        #    print("Warning: df is a Series, converting to DataFrame")
-        #df = df.to_frame()
+        df = pd.read_csv(file_path, delimiter=";")
+        df = df.dropna()  # Optional: Drop rows with missing values
+
+        # Versuche, die mittlere Spalte in numerischen Typ zu konvertieren
+        df['7d-Median SARS-CoV-2 Abwasser'] = pd.to_numeric(df['7d-Median SARS-CoV-2 Abwasser'], errors='coerce')
         return df
     except Exception as e:
         print(f"Error during preprocessing: {e}")
@@ -153,25 +152,53 @@ def set_objective(model, T, PosRatio, data, n_cases):
     """
     # Calculate the proportion of positive cases in the dataset
     # NOTEX TO SELF: Der Typ hat ein Problem mit Leerzeichen, wird da immer ein Fehler herausgeben 
-    positives_dataset = (
-    (data['Temperatur'] > 25) &  # Temperatur größer als 25 Grad
-    (data['Temperatur'] <= 30) &  # Temperatur kleiner oder gleich 30 Grad
-    (data['Wetterlage'] == 'partly-cloudy-day')  # Wetterlage: teilweise bewölkt
-        ).astype(int)
+    #positives_dataset = (data['7d-Median SARS-CoV-2 Abwasser'] > 1e13).astype(int)
+    #target_share_dataset = sum(positives_dataset) / n_cases
+    # Introduce auxiliary variables for SD_size and SD_positives becuase the linear approximation needs variables 
+    #SD_size = model.addVar(vtype=GRB.CONTINUOUS, name="SD_size")
+    #SD_positives = model.addVar(vtype=GRB.CONTINUOUS, name="SD_positives")
+    #PosRatio = model.addVar(vtype=GRB.CONTINUOUS, name="PosRatio")
+    # Link the SD_size to the sum of selected cases
+    #model.addConstr(SD_size == gp.quicksum(T[c] for c in range(n_cases)), "SD_size_Constraint")
+    # Link SD_positives to the sum of positive cases in the subgroup
+    #model.addConstr(SD_positives == gp.quicksum(positives_dataset[c] * T[c] for c in range(n_cases)), "SD_positives_Constraint")
+    # Set PosRatio as the ratio of positives in the subgroup
+    #model.addConstr(PosRatio * SD_size == SD_positives, "PosRatio_Definition")
+    # Example in Gurobi using piecewise-linear approximation (PWL)
+    #breakpoints = [1, 10, 20, 30, 33]  # Define breakpoints for SD_size based on your dataset
+    #values = [0, 5, 10, 15, 33]        # Corresponding values for SD_positives at each breakpoint
 
-
-    target_share_dataset = sum(positives_dataset) / n_cases
-
-    # Define subgroup size and positive count within the subgroup
-    SD_size = gp.quicksum(T[c] for c in range(n_cases))
-    SD_positives = gp.quicksum(positives_dataset[c] * T[c] for c in range(n_cases))
-
-    # Constraint to define the positive ratio in the subgroup
-    model.addConstr(PosRatio * SD_size == SD_positives, "PosRatioConstraint")
+    # Adding the PWL constraint for linearizing the product
+    #model.addGenConstrPWL(SD_size, SD_positives, breakpoints, values, "PosRatioConstraint_PWL")
 
     # Objective function to maximize WRAcc
-    Q_SD = (SD_size / n_cases) * (PosRatio - target_share_dataset)
-    model.setObjective(Q_SD, GRB.MAXIMIZE)
+    #Q_SD = (SD_size / n_cases) * (PosRatio - target_share_dataset)
+    #model.setObjective(Q_SD, GRB.MAXIMIZE)
+
+    #QUADRATIC CONSTRAINT
+    #SD_size = gp.quicksum(T[c] for c in range(n_cases))
+    #SD_positives = gp.quicksum(positives_dataset[c] * T[c] for c in range(n_cases))
+    #model.addConstr(PosRatio * SD_size == SD_positives, "PosRatioConstraint")
+    #Q_SD = (SD_size / n_cases) * (PosRatio - target_share_dataset)
+    #model.setObjective(Q_SD, GRB.MAXIMIZE)
+    try:
+        positives_dataset = (data['7d-Median SARS-CoV-2 Abwasser'] > 1e13).astype(int)
+        target_share_dataset = positives_dataset.sum() / n_cases
+
+        # Hilfsvariablen für die Größe der Subgruppe und die Anzahl positiver Fälle in der Subgruppe
+        SD_size = gp.quicksum(T[c] for c in range(n_cases))
+        SD_positives = gp.quicksum(positives_dataset.iloc[c] * T[c] for c in range(n_cases))
+
+        # Berechne eine lineare Version des WRAcc, ohne Division
+        # WRAcc ~ SD_positives - target_share_dataset * SD_size
+        Q_SD = SD_positives - target_share_dataset * SD_size
+
+        # Setze das Objective auf die angepasste WRAcc-Berechnung
+        model.setObjective(Q_SD, GRB.MAXIMIZE)
+        print("Set WRAcc as the objective successfully (without division by variable)")
+
+    except Exception as e:
+        print(f"Error in set_objective (WRAcc): {e}")
 
 def run_optimization(model):
     """
@@ -181,16 +208,26 @@ def run_optimization(model):
         model (gp.Model): Gurobi model.
     """
     model.optimize()
+    model.write("presolved_model.lp")
+    model.write("presolved_model.mps")
     model.write("model.lp")
     if model.status == GRB.INFEASIBLE:
-                print("Model is infeasible. Computing IIS...")
-                model.computeIIS()
-                model.write("infeasible_model.ilp")
-
-    if model.status == GRB.OPTIMAL:
-        print("Optimal solution found:")
+            print("Model is infeasible. Computing IIS...")
+            model.computeIIS()
+            model.write("infeasible_model.ilp")
+    elif model.status == GRB.OPTIMAL:
+            print("Optimal solution found.")
     else:
-        print("No optimal solution found.")
+        print(f"Optimization was unsuccessful. Gurobi status code: {model.status}")
+            # Additional information in case of suboptimal or error status
+        if model.status == GRB.INTERRUPTED:
+            print("Optimization was interrupted.")
+        elif model.status == GRB.INF_OR_UNBD:
+            print("Model is infeasible or unbounded.")
+        elif model.status == GRB.UNBOUNDED:
+            print("Model is unbounded.")
+        elif model.status == GRB.CUTOFF:
+            print("Objective cutoff limit reached.")
 
 
 def main(file_path):
@@ -202,34 +239,40 @@ def main(file_path):
     """
     try:
         def run_optimization_pipeline(file_path):
+            print("Made it here")
             data = load_and_preprocess_data(file_path)
+            print("After loading")
             print(data.columns)
             selectors = define_selectors(data)  # Define selectors based on the sampled data
+            print("Selectors")
             n_cases = len(data)  # Get number of cases in the sampled data
-    
+
             model, T, D, PosRatio = setup_model(n_cases, selectors)
+            print("Set up model")
             set_objective(model, T, PosRatio, data, n_cases)
+            print("Set objective")
             run_optimization(model)
 
-            # Subgruppe definieren: Wetterlage ist 'partly-cloudy-day' und Fußgängeranzahl > 10.000
-            positive_cases = data[(data['Wetterlage'] == 'partly-cloudy-day') & (data['Fußgänger insgesamt'] > 10000)]
+            # Definieren der Subgruppe basierend auf hohen Abwasserkonzentrationen und Fallzahlen
+            high_cases = data[(data['7d-Median SARS-CoV-2 Abwasser'] > 1e13) & (data['7d-Median SARS-CoV-2-Fälle'] > 50)]
 
             # Ausgabe der Subgruppe
-            print(positive_cases)
+            print("Subgroup with high SARS-CoV-2 concentration and cases:")
+            print(high_cases)
 
             # Visualisierung der Subgruppe
             plt.figure(figsize=(10, 6))
 
             # Scatterplot für alle Daten (grau)
-            plt.scatter(data['Temperatur'], data['Fußgänger insgesamt'], color='gray', alpha=0.5, label='Alle Daten')
+            plt.scatter(data['Datum'], data['7d-Median SARS-CoV-2 Abwasser'], color='gray', alpha=0.5, label='Alle Daten')
 
-            # Scatterplot für die positiven Fälle (blau)
-            plt.scatter(positive_cases['Temperatur'], positive_cases['Fußgänger insgesamt'], color='blue', label='Positive Fälle')
+            # Scatterplot für die hohen Fälle (blau)
+            plt.scatter(high_cases['Datum'], high_cases['7d-Median SARS-CoV-2 Abwasser'], color='blue', label='High Cases')
 
             # Titel und Achsenbeschriftungen
-            plt.title('Fußgängeranzahl vs. Temperatur (Positive Fälle: partly-cloudy-day & Fußgänger > 10000)')
-            plt.xlabel('Temperatur')
-            plt.ylabel('Fußgänger insgesamt')
+            plt.title('SARS-CoV-2 Abwasser-Konzentration vs. Datum (High Cases)')
+            plt.xlabel('Datum')
+            plt.ylabel('7d-Median SARS-CoV-2 Abwasser')
 
             # Legende
             plt.legend()
@@ -246,7 +289,7 @@ def main(file_path):
         print(f"An error occurred during the optimization process: {e}")
 
 if __name__ == "__main__":
-    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/besucher.csv" 
+    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/abwasserCovid.csv" 
     main(file_path)  # Pass the file_path argument to main
     
 
