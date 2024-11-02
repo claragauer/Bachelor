@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import sys
 import matplotlib.pyplot as plt
+import time
 
 # Get the directory of the current script
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -14,8 +15,10 @@ from preprocess_data import load_data, handle_missing_values, handle_outliers
 from evaluate_models import measure_memory_usage
 # Constants
 TARGET_VALUE = 1
-RESULT_SET_SIZE = 3
+RESULT_SET_SIZE = 10
 SEARCH_DEPTH = 2
+THRESHOLD_ABWASSER = 1e13  # Schwellenwert für SARS-CoV-2-Konzentration im Abwasser
+THRESHOLD_FALLS = 50       # Schwellenwert für gemeldete SARS-CoV-2-Fälle
 
 def load_and_preprocess_data(file_path):
     """
@@ -30,8 +33,16 @@ def load_and_preprocess_data(file_path):
     """
     try:
         df = load_data(file_path)
-        df = handle_missing_values(df)
-        df = handle_outliers(df)
+        df = pd.read_csv(file_path)
+        
+        # Entferne alle Zeilen, die komplett leer sind
+        df.dropna(inplace=True)
+
+        # Optional: Entferne Zeilen, die in bestimmten Spalten NaN-Werte haben
+        # df.dropna(subset=['7d-Median SARS-CoV-2 Abwasser', '7d-Median SARS-CoV-2-Fälle'], inplace=True)
+
+        print("Data after dropping NaN rows:")
+        print(df.head())
         return df
     except Exception as e:
         print(f"Error during preprocessing: {e}")
@@ -48,13 +59,12 @@ def define_target(df):
     Returns:
         ps.BinaryTarget: The target for subgroup discovery.
     """
-    threshold = 10000
-    # Create a binary target based on whether pedestrian count exceeds the threshold
-    df['Binary_Pedestrian'] = (df['Fußgänger insgesamt'] > threshold).astype(int)
-    
-    # Define the binary target using the new column
-    target = ps.BinaryTarget('Binary_Pedestrian', 1)  # Target is 1 (true) if pedestrian count > threshold
-    
+    # Datensatz Abwasser Covid
+    #df['High_Abwasser'] = (df['7d-Median SARS-CoV-2 Abwasser'] > THRESHOLD_ABWASSER).astype(int)
+    #target = ps.BinaryTarget('High_Abwasser', 1)
+    # Datensatz 2
+    df['High_Insgesamt'] = (df['Insgesamt'] > 5000).astype(int)
+    target = ps.BinaryTarget('High_Insgesamt', TARGET_VALUE)
     return target
     
 
@@ -68,15 +78,33 @@ def create_search_space(columns):
     Returns:
         list: List of possible selectors for subgroup discovery.
     """
-    # NOTEX TO SELF: es gibt keinen Numeric Selector 
-    weather_conditions = ['rain', 'partly-cloudy-day', 'clear-day']
+    search_space = []
     
-    # Create selectors for Wetterlage
-    search_space = [ps.EqualitySelector('Wetterlage', condition) for condition in weather_conditions]
+    # Datensatz 1
+    #concentration_ranges = [(1e12, 2e13), (2e13, 3e13), (3e13, 5e13)]
+    #search_space += [ps.IntervalSelector('7d-Median SARS-CoV-2 Abwasser', start, end) for start, end in concentration_ranges]
+    #cases_ranges = [(0, 50), (50, 200), (200, 1000)]
+    #search_space += [ps.IntervalSelector('7d-Median SARS-CoV-2-Fälle', start, end) for start, end in cases_ranges]
+
+    # Datensatz 2
+    #age_groups = ['00 - 09', '10 - 19', '20 - 29', '30 - 39', '40 - 49', '50 - 59', '60 - 69', '70 - 79', '80 - 89']
+    #genders = ['MA', 'FE']
+    #search_space += [ps.EqualitySelector('Altersklasse', age_group) for age_group in age_groups]
+    #search_space += [ps.EqualitySelector('Geschlecht', gender) for gender in genders]
+    #personen_ranges = [(1, 5), (6, 10), (11, 20)]
+    #search_space += [ps.IntervalSelector('Anzahl_Personen', start, end) for start, end in personen_ranges]
     
-    # Create selectors for temperature intervals
-    temperature_ranges = [(15, 25), (25, 35), (35, 45)]  # Example ranges
-    search_space += [ps.IntervalSelector('Temperatur', start, end) for start, end in temperature_ranges]
+    #Datensatz 3 - Arbeitslosigkeit
+    # Selektoren für 'Insgesamt', 'Männer', 'Frauen' und 'Langzeitarbeitslose'
+    # Intervalle und Kategorien für die Subgruppen
+    total_ranges = [(4000, 5000), (5000, 6000)]
+    men_ranges = [(2000, 2500), (2500, 3000)]
+    women_ranges = [(2000, 2300), (2300, 2500)]
+    longterm_unemployed_ranges = [(1500, 1600), (1600, 1800)]
+    search_space += [ps.IntervalSelector('Insgesamt', start, end) for start, end in total_ranges]
+    search_space += [ps.IntervalSelector('Männer', start, end) for start, end in men_ranges]
+    search_space += [ps.IntervalSelector('Frauen', start, end) for start, end in women_ranges]
+    search_space += [ps.IntervalSelector('Langzeitarbeitslose', start, end) for start, end in longterm_unemployed_ranges]
     
     return search_space
     
@@ -144,53 +172,55 @@ def main(file_path):
         file_path (str): Path to the CSV file.
     """
     try:
+        # Capture start time for runtime measurement
+        start_time = time.time()
         
+        # Measure memory usage during the optimization pipeline
+        def run_optimization_pipeline(file_path):
             df = load_and_preprocess_data(file_path)
+            if isinstance(df, pd.Series):
+                df = df.to_frame()
             target = define_target(df)
             search_space = create_search_space(df)
             result_df = run_subgroup_discovery(df, target, search_space)
-             # Anzeige und Visualisierung der Ergebnisse
+
+            # Display and visualize results
             for i, row in result_df.iterrows():
                 print(f"Details of Subgroup {i}:")
                 print(row)
                 print(f"Conditions of Subgroup {i}: {row['subgroup']}")
                 print("-" * 40)
 
-                # Extrahiere die Bedingung und finde die Fälle, die diese Subgruppe erfüllen
+                # Extract condition and identify cases within this subgroup
                 subgroup_condition = row['subgroup']
-                
-                # Filter für die Subgruppe anwenden (subgroup_condition.covers(df) gibt die gefilterten Zeilen zurück)
                 positive_cases = df[subgroup_condition.covers(df)]
-                
-                # Visualisierung der Subgruppe
+
                 plt.figure(figsize=(10, 6))
-
-                # Scatterplot für alle Daten (grau)
-                plt.scatter(df['Temperatur'], df['Fußgänger insgesamt'], color='gray', alpha=0.5, label='Alle Daten')
-
-                # Scatterplot für die positiven Fälle (blau)
-                plt.scatter(positive_cases['Temperatur'], positive_cases['Fußgänger insgesamt'], color='blue', label='Positive Fälle')
-
-                # Titel und Achsenbeschriftungen
-                plt.title(f'Subgroup {i}: Fußgängeranzahl vs. Temperatur')
-                plt.xlabel('Temperatur')
-                plt.ylabel('Fußgänger insgesamt')
-
-                # Legende
+                plt.scatter(df.index, df['Insgesamt'], color='gray', alpha=0.5, label='Alle Daten')
+                plt.scatter(positive_cases.index, positive_cases['Insgesamt'], color='blue', label='Positive Cases')
+                plt.title(f'Subgroup {i}: Insgesamt über Eintragsindex')
+                plt.xlabel('Eintragsindex')
+                plt.ylabel('Insgesamt')
                 plt.legend()
-
-                # Plot anzeigen
                 plt.show()
 
-        # Speicherverbrauch messen
-        #_, peak_memory = measure_memory_usage(file_path)
-        #print(f"The peak memory usage during the optimization for {file_path} was: {peak_memory:.2f} MB")
 
+        # Run the optimization pipeline with memory measurement
+        _, peak_memory = measure_memory_usage(run_optimization_pipeline, file_path)
+        
+        # Capture end time and calculate elapsed time
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+
+        # Output memory and runtime
+        print(f"The peak memory usage during the optimization for {file_path} was: {peak_memory:.2f} MB")
+        print(f"Total runtime: {elapsed_time:.2f} seconds")
+        
     except Exception as e:
         print(f"An error occurred during the main execution: {e}")
 
 if __name__ == "__main__":
-    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/besucher.csv" 
+    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/arbeitslosenquote.csv" 
     main(file_path)  # Pass the file_path argument to main
     
 
