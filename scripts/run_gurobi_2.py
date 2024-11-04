@@ -2,7 +2,6 @@ import gurobipy as gp
 from gurobipy import GRB
 import pandas as pd
 import sys
-import time
 import os
 import matplotlib.pyplot as plt
 # Get the directory of the current script
@@ -34,12 +33,11 @@ def load_and_preprocess_data(file_path):
         dict: Dictionary of LabelEncoders used for encoding categorical columns.
     """
     try:
-        df = pd.read_csv(file_path)
+        df = pd.read_csv(file_path, delimiter=";")
         df = df.dropna()  # Optional: Drop rows with missing values
-        print(df.dtypes)
 
         # Versuche, die mittlere Spalte in numerischen Typ zu konvertieren
-        #df['7d-Median SARS-CoV-2 Abwasser'] = pd.to_numeric(df['7d-Median SARS-CoV-2 Abwasser'], errors='coerce')
+        df['7d-Median SARS-CoV-2 Abwasser'] = pd.to_numeric(df['7d-Median SARS-CoV-2 Abwasser'], errors='coerce')
         return df
     except Exception as e:
         print(f"Error during preprocessing: {e}")
@@ -59,25 +57,21 @@ def define_selectors(data):
         dict: Dictionary of binary selectors, where each key is a condition and each value is a binary vector.
     """
 
-    # Definierte Schwellenwerte (diese können angepasst werden)
-    THRESHOLD_HIGH = 5000
-    THRESHOLD_LOW = 4600
-
-    selectors = {}  # Initialize an empty dictionary to store selectors
-    # Selektoren für hohe und niedrige Werte in den einzelnen Spalten
-    selectors["High_Insgesamt"] = (data["Insgesamt"] > THRESHOLD_HIGH).astype(int)
-    selectors["Low_Insgesamt"] = (data["Insgesamt"] < THRESHOLD_LOW).astype(int)
-    selectors["High_Männer"] = (data["Männer"] > THRESHOLD_HIGH).astype(int)
-    selectors["Low_Männer"] = (data["Männer"] < THRESHOLD_LOW).astype(int)
-    selectors["High_Frauen"] = (data["Frauen"] > THRESHOLD_HIGH).astype(int)
-    selectors["Low_Frauen"] = (data["Frauen"] < THRESHOLD_LOW).astype(int)
-    selectors["High_Langzeitarbeitslose"] = (data["Langzeitarbeitslose"] > THRESHOLD_HIGH).astype(int)
-    selectors["Low_Langzeitarbeitslose"] = (data["Langzeitarbeitslose"] < THRESHOLD_LOW).astype(int)
-
-    # Ergebnisse der Selektoren anzeigen
-    for selector_name, selector_values in selectors.items():
-        print(f"{selector_name}: {selector_values.tolist()}")
+    selectors = {} # Initialize an empty dictionary to store selectors
     
+    # Iterate over each column in the data frame to create selectors based on unique values
+    for column in data.columns:
+        unique_values = data[column].unique() # Get all unique values in the column 
+        # Create selectors only for columns with a manageable number of unique values to avoid excessive computation.
+        if len(unique_values) <= MAXIMUM_UNIQUE_VALUES:  
+            # Iterate over each unique value to create a corresponding binary selector
+            for value in unique_values:
+                # Create unique selector name by combining the column and the value 
+                selector_name = f"{column}_{value}"
+                selectors[selector_name] = (data[column] == value).astype(int)
+        else:
+            print(f"Skipping column '{column}' due to too many unique values ({len(unique_values)}).")
+
     return selectors
 
 
@@ -102,7 +96,9 @@ def setup_model(n_cases, selectors):
     # Decision Variables
     T = model.addVars(n_cases, vtype=GRB.BINARY, name="T")  # Binary vector indicating subgroup membership
     D = model.addVars(len(selectors), vtype=GRB.BINARY, name="D")  # Binary vector indicating active selectors
-    PosRatio = model.addVar(name="PosRatio")  # Positive ratio in the subgroup
+    PosRatio = model.addVar(vtype=GRB.CONTINUOUS, name="PosRatio")  # Positive ratio in the subgroup
+
+    model.update()
 
     # Constraints to relate T and D based on the dataset
     for i, (selector_name, selector_values) in enumerate(selectors.items()):
@@ -156,58 +152,36 @@ def set_objective(model, T, PosRatio, data, n_cases):
         data (pd.DataFrame): Preprocessed DataFrame.
         n_cases (int): Number of cases.
     """
-    # Calculate the proportion of positive cases in the dataset
-    # NOTEX TO SELF: Der Typ hat ein Problem mit Leerzeichen, wird da immer ein Fehler herausgeben 
-    #positives_dataset = (data['7d-Median SARS-CoV-2 Abwasser'] > 1e13).astype(int)
-    #target_share_dataset = sum(positives_dataset) / n_cases
-    # Introduce auxiliary variables for SD_size and SD_positives becuase the linear approximation needs variables 
-    #SD_size = model.addVar(vtype=GRB.CONTINUOUS, name="SD_size")
-    #SD_positives = model.addVar(vtype=GRB.CONTINUOUS, name="SD_positives")
-    #PosRatio = model.addVar(vtype=GRB.CONTINUOUS, name="PosRatio")
-    # Link the SD_size to the sum of selected cases
-    #model.addConstr(SD_size == gp.quicksum(T[c] for c in range(n_cases)), "SD_size_Constraint")
-    # Link SD_positives to the sum of positive cases in the subgroup
-    #model.addConstr(SD_positives == gp.quicksum(positives_dataset[c] * T[c] for c in range(n_cases)), "SD_positives_Constraint")
-    # Set PosRatio as the ratio of positives in the subgroup
-    #model.addConstr(PosRatio * SD_size == SD_positives, "PosRatio_Definition")
-    # Example in Gurobi using piecewise-linear approximation (PWL)
-    #breakpoints = [1, 10, 20, 30, 33]  # Define breakpoints for SD_size based on your dataset
-    #values = [0, 5, 10, 15, 33]        # Corresponding values for SD_positives at each breakpoint
-
-    # Adding the PWL constraint for linearizing the product
-    #model.addGenConstrPWL(SD_size, SD_positives, breakpoints, values, "PosRatioConstraint_PWL")
-
-    # Objective function to maximize WRAcc
-    #Q_SD = (SD_size / n_cases) * (PosRatio - target_share_dataset)
-    #model.setObjective(Q_SD, GRB.MAXIMIZE)
-
-    #QUADRATIC CONSTRAINT
-    try: 
-        positives_dataset = (data['Insgesamt'] > 5000).astype(int)
+    try:
+        # Update the model to finalize variables before use
+        model.update()
+        
+        # Calculate the target share of positives in the overall dataset
+        positives_dataset = (data['7d-Median SARS-CoV-2 Abwasser'] > 1e13).astype(int)
         target_share_dataset = positives_dataset.sum() / n_cases
-        SD_size = gp.quicksum(T[c] for c in range(n_cases))
-        SD_positives = gp.quicksum(positives_dataset[c] * T[c] for c in range(n_cases))
-        model.addConstr(PosRatio * SD_size == SD_positives, "PosRatioConstraint")
-        Q_SD = (SD_size / n_cases) * (PosRatio - target_share_dataset)
+
+        # Auxiliary variables for subgroup size and number of positives in subgroup
+        SD_size = model.addVar(name="SD_size", vtype=GRB.CONTINUOUS)
+        SD_positives = model.addVar(name="SD_positives", vtype=GRB.CONTINUOUS)
+
+        # Define SD_size as the sum of T[c] (subgroup size)
+        model.addConstr(SD_size == gp.quicksum(T[c] for c in range(n_cases)), "SD_size_Definition")
+
+        # Define SD_positives as the sum of positive cases in the subgroup
+        model.addConstr(SD_positives == gp.quicksum(positives_dataset.iloc[c] * T[c] for c in range(n_cases)), "SD_positives_Definition")
+
+        # Define PosRatio as the proportion of positives in the subgroup
+        model.addConstr(PosRatio * SD_size == SD_positives, "PosRatio_Definition")
+
+        # Reformulate objective: maximize Q_SD = SD_size * (PosRatio - target_share_dataset)
+        Q_SD = SD_size * (SD_positives / SD_size - target_share_dataset)
         model.setObjective(Q_SD, GRB.MAXIMIZE)
-    #try:
-    #    positives_dataset = (data['Insgesamt'] > 5000).astype(int)
-    #    target_share_dataset = positives_dataset.sum() / n_cases
-
-        # Hilfsvariablen für die Größe der Subgruppe und die Anzahl positiver Fälle in der Subgruppe
-    #    SD_size = gp.quicksum(T[c] for c in range(n_cases))
-    #    SD_positives = gp.quicksum(positives_dataset.iloc[c] * T[c] for c in range(n_cases))
-
-        # Berechne eine lineare Version des WRAcc, ohne Division
-        # WRAcc ~ SD_positives - target_share_dataset * SD_size
-    #    Q_SD = ((SD_size) / n_cases) * ((SD_positives) / (SD_size) - target_share_dataset)
-
-        # Setze das Objective auf die angepasste WRAcc-Berechnung
-    #    model.setObjective(Q_SD, GRB.MAXIMIZE)
-    #    print("Set WRAcc as the objective successfully (without division by variable)")
-
+        
+        print("Objective set to maximize WRAcc with correct division structure.")
+        
     except Exception as e:
         print(f"Error in set_objective (WRAcc): {e}")
+
 
 def run_optimization(model):
     """
@@ -248,7 +222,6 @@ def main(file_path):
     """
     try:
         def run_optimization_pipeline(file_path):
-            start_time = time.time()
             print("Made it here")
             data = load_and_preprocess_data(file_path)
             print("After loading")
@@ -262,29 +235,27 @@ def main(file_path):
             set_objective(model, T, PosRatio, data, n_cases)
             print("Set objective")
             run_optimization(model)
-            end_time = time.time()
-            elapsed_time = end_time - start_time
-            print(f"Elapsed time for the optimization pipeline: {elapsed_time:.2f} seconds")
 
-            # Definieren der Subgruppe basierend auf hohen Werten in 'Insgesamt' und 'Langzeitarbeitslose'
-            high_cases = data[(data['Insgesamt'] > 5000) & (data['Langzeitarbeitslose'] > 1600)]
+            # Definieren der Subgruppe basierend auf hohen Abwasserkonzentrationen und Fallzahlen
+            high_cases = data[(data['7d-Median SARS-CoV-2 Abwasser'] > 1e13) & (data['7d-Median SARS-CoV-2-Fälle'] > 50)]
 
             # Ausgabe der Subgruppe
-            print("Subgroup with high 'Insgesamt' and 'Langzeitarbeitslose':")
+            print("Subgroup with high SARS-CoV-2 concentration and cases:")
             print(high_cases)
 
             # Visualisierung der Subgruppe
             plt.figure(figsize=(10, 6))
 
             # Scatterplot für alle Daten (grau)
-            plt.scatter(data.index, data['Insgesamt'], color='gray', alpha=0.5, label='Alle Daten')
+            plt.scatter(data['Datum'], data['7d-Median SARS-CoV-2 Abwasser'], color='gray', alpha=0.5, label='Alle Daten')
 
             # Scatterplot für die hohen Fälle (blau)
-            plt.scatter(high_cases.index, high_cases['Insgesamt'], color='blue', label='High Cases')
+            plt.scatter(high_cases['Datum'], high_cases['7d-Median SARS-CoV-2 Abwasser'], color='blue', label='High Cases')
+
             # Titel und Achsenbeschriftungen
-            plt.title('Gesamtzahl vs. Eintragsindex (Hohe Fälle)')
-            plt.xlabel('Eintragsindex')
-            plt.ylabel('Gesamtzahl der Personen')
+            plt.title('SARS-CoV-2 Abwasser-Konzentration vs. Datum (High Cases)')
+            plt.xlabel('Datum')
+            plt.ylabel('7d-Median SARS-CoV-2 Abwasser')
 
             # Legende
             plt.legend()
@@ -301,7 +272,7 @@ def main(file_path):
         print(f"An error occurred during the optimization process: {e}")
 
 if __name__ == "__main__":
-    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/arbeitslosenquote.csv" 
+    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/abwasserCovid.csv" 
     main(file_path)  # Pass the file_path argument to main
     
 

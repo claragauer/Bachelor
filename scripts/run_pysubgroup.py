@@ -36,10 +36,11 @@ def load_and_preprocess_data(file_path):
         df = pd.read_csv(file_path)
         
         # Entferne alle Zeilen, die komplett leer sind
-        df.dropna(inplace=True)
+        #df.dropna(inplace=True)
+        df= df.dropna(axis=1) # drop columns which are empty
 
         # Optional: Entferne Zeilen, die in bestimmten Spalten NaN-Werte haben
-        # df.dropna(subset=['7d-Median SARS-CoV-2 Abwasser', '7d-Median SARS-CoV-2-Fälle'], inplace=True)
+        #df.dropna(subset=['7d-Median SARS-CoV-2 Abwasser', '7d-Median SARS-CoV-2-Fälle'], inplace=True)
 
         print("Data after dropping NaN rows:")
         print(df.head())
@@ -63,8 +64,11 @@ def define_target(df):
     #df['High_Abwasser'] = (df['7d-Median SARS-CoV-2 Abwasser'] > THRESHOLD_ABWASSER).astype(int)
     #target = ps.BinaryTarget('High_Abwasser', 1)
     # Datensatz 2
-    df['High_Insgesamt'] = (df['Insgesamt'] > 5000).astype(int)
-    target = ps.BinaryTarget('High_Insgesamt', TARGET_VALUE)
+    #df['High_Insgesamt'] = (df['Insgesamt'] > 5000).astype(int)
+    #target = ps.BinaryTarget('High_Insgesamt', TARGET_VALUE)
+    # Datensatz Geothermal Field - California 
+    df['High_Capacity'] = (df['Total_MWe_Mean'] > 100).astype(int)
+    target = ps.BinaryTarget('High_Capacity', 1)
     return target
     
 
@@ -97,15 +101,24 @@ def create_search_space(columns):
     #Datensatz 3 - Arbeitslosigkeit
     # Selektoren für 'Insgesamt', 'Männer', 'Frauen' und 'Langzeitarbeitslose'
     # Intervalle und Kategorien für die Subgruppen
-    total_ranges = [(4000, 5000), (5000, 6000)]
-    men_ranges = [(2000, 2500), (2500, 3000)]
-    women_ranges = [(2000, 2300), (2300, 2500)]
-    longterm_unemployed_ranges = [(1500, 1600), (1600, 1800)]
-    search_space += [ps.IntervalSelector('Insgesamt', start, end) for start, end in total_ranges]
-    search_space += [ps.IntervalSelector('Männer', start, end) for start, end in men_ranges]
-    search_space += [ps.IntervalSelector('Frauen', start, end) for start, end in women_ranges]
-    search_space += [ps.IntervalSelector('Langzeitarbeitslose', start, end) for start, end in longterm_unemployed_ranges]
+    #total_ranges = [(4000, 5000), (5000, 6000)]
+    #men_ranges = [(2000, 2500), (2500, 3000)]
+    #women_ranges = [(2000, 2300), (2300, 2500)]
+    #longterm_unemployed_ranges = [(1500, 1600), (1600, 1800)]
+    #search_space += [ps.IntervalSelector('Insgesamt', start, end) for start, end in total_ranges]
+    #search_space += [ps.IntervalSelector('Männer', start, end) for start, end in men_ranges]
+    #search_space += [ps.IntervalSelector('Frauen', start, end) for start, end in women_ranges]
+    #search_space += [ps.IntervalSelector('Langzeitarbeitslose', start, end) for start, end in longterm_unemployed_ranges]
     
+    # Datensatz 4 - Geothermal Spaces - California
+    # Intervals for geothermal power capacity (Total_MWe_Mean)
+    capacity_ranges = [(0, 100), (100, 500), (500, 1000), (1000, 2000)]
+    search_space += [ps.IntervalSelector('Total_MWe_Mean', start, end) for start, end in capacity_ranges]
+    undeveloped_ranges = [(0, 50), (50, 100), (100, 500), (500, 1000)]
+    search_space += [ps.IntervalSelector('NetUndevelopedRP', start, end) for start, end in undeveloped_ranges]
+    area_ranges = [(0, 10000), (10000, 50000), (50000, 100000), (100000, 500000)]
+    search_space += [ps.IntervalSelector('Acres_GeothermalField', start, end) for start, end in area_ranges]
+    search_space += [ps.EqualitySelector('ProtectedArea_Exclusion', value) for value in [0, 1]]
     return search_space
     
 
@@ -195,12 +208,13 @@ def main(file_path):
                 subgroup_condition = row['subgroup']
                 positive_cases = df[subgroup_condition.covers(df)]
 
+                # Plotting the results
                 plt.figure(figsize=(10, 6))
-                plt.scatter(df.index, df['Insgesamt'], color='gray', alpha=0.5, label='Alle Daten')
-                plt.scatter(positive_cases.index, positive_cases['Insgesamt'], color='blue', label='Positive Cases')
-                plt.title(f'Subgroup {i}: Insgesamt über Eintragsindex')
-                plt.xlabel('Eintragsindex')
-                plt.ylabel('Insgesamt')
+                plt.scatter(df.index, df['Total_MWe_Mean'], color='gray', alpha=0.5, label='All Data')
+                plt.scatter(positive_cases.index, positive_cases['Total_MWe_Mean'], color='blue', label='Positive Cases')
+                plt.title(f'Subgroup {i}: Total MWe Mean by Entry Index')
+                plt.xlabel('Entry Index')
+                plt.ylabel('Total MWe Mean')
                 plt.legend()
                 plt.show()
 
@@ -220,7 +234,7 @@ def main(file_path):
         print(f"An error occurred during the main execution: {e}")
 
 if __name__ == "__main__":
-    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/arbeitslosenquote.csv" 
+    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/geothermal.csv" 
     main(file_path)  # Pass the file_path argument to main
     
 
