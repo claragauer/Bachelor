@@ -3,6 +3,7 @@ from gurobipy import GRB
 import pandas as pd
 import sys
 import time
+import tracemalloc
 import os
 import matplotlib.pyplot as plt
 # Get the directory of the current script
@@ -16,9 +17,11 @@ from preprocess_data import load_data, handle_missing_values, handle_outliers, e
 from evaluate_models import measure_memory_usage
 
 # Constants for constraints to avoid using floating-point numbers directly in the code
-THETA_DC = 2           # Maximum number of selectors allowed
+THETA_DC = 10           # Maximum number of selectors allowed
 THETA_CC = 2           # Minimum coverage required for the subgroup
 THETA_MAX_RATIO = 0.5  # Maximum ratio of cases that can be included in the subgroup
+THRESHOLD_HIGH = 1000
+THRESHOLD_LOW = 200
 
 MAXIMUM_UNIQUE_VALUES = 1000 # Maximum number of unique numbers allowed in order to create selectors.
 
@@ -33,17 +36,14 @@ def load_and_preprocess_data(file_path):
         pd.DataFrame: Preprocessed DataFrame.
         dict: Dictionary of LabelEncoders used for encoding categorical columns.
     """
-    try:
-        df = pd.read_csv(file_path)
-        df = df.dropna()  # Optional: Drop rows with missing values
-        print(df.dtypes)
-
-        # Versuche, die mittlere Spalte in numerischen Typ zu konvertieren
-        #df['7d-Median SARS-CoV-2 Abwasser'] = pd.to_numeric(df['7d-Median SARS-CoV-2 Abwasser'], errors='coerce')
-        return df
-    except Exception as e:
-        print(f"Error during preprocessing: {e}")
-        raise
+    
+    df = pd.read_csv(file_path, delimiter=';')
+    
+    # Convert week-year to standard datetime for consistency
+    df['Kalenderwoche'] = pd.to_datetime(df['Kalenderwoche'] + '-1', format='%Y-%W-%w', errors='coerce')
+    df['Sieben-Tage-Inzidenz'] = pd.to_numeric(df['Sieben-Tage-Inzidenz'], errors='coerce').fillna(0)
+    
+    return df
 
 
 def define_selectors(data):
@@ -59,25 +59,10 @@ def define_selectors(data):
         dict: Dictionary of binary selectors, where each key is a condition and each value is a binary vector.
     """
 
-    # Definierte Schwellenwerte (diese können angepasst werden)
-    THRESHOLD_HIGH = 5000
-    THRESHOLD_LOW = 4600
-
-    selectors = {}  # Initialize an empty dictionary to store selectors
-    # Selektoren für hohe und niedrige Werte in den einzelnen Spalten
-    selectors["High_Insgesamt"] = (data["Insgesamt"] > THRESHOLD_HIGH).astype(int)
-    selectors["Low_Insgesamt"] = (data["Insgesamt"] < THRESHOLD_LOW).astype(int)
-    selectors["High_Männer"] = (data["Männer"] > THRESHOLD_HIGH).astype(int)
-    selectors["Low_Männer"] = (data["Männer"] < THRESHOLD_LOW).astype(int)
-    selectors["High_Frauen"] = (data["Frauen"] > THRESHOLD_HIGH).astype(int)
-    selectors["Low_Frauen"] = (data["Frauen"] < THRESHOLD_LOW).astype(int)
-    selectors["High_Langzeitarbeitslose"] = (data["Langzeitarbeitslose"] > THRESHOLD_HIGH).astype(int)
-    selectors["Low_Langzeitarbeitslose"] = (data["Langzeitarbeitslose"] < THRESHOLD_LOW).astype(int)
-
-    # Ergebnisse der Selektoren anzeigen
-    for selector_name, selector_values in selectors.items():
-        print(f"{selector_name}: {selector_values.tolist()}")
-    
+    selectors = {
+        "HighCases": (data["Sieben-Tage-Inzidenz"] > THRESHOLD_HIGH).astype(int),
+        "LowCases": (data["Sieben-Tage-Inzidenz"] < THRESHOLD_LOW).astype(int)
+    }
     return selectors
 
 
@@ -96,7 +81,7 @@ def setup_model(n_cases, selectors):
         gp.Var: PosRatio (variable for the positive ratio in the subgroup).
     """
     # Create Gurobi model
-    model = gp.Model("Subgroup_Discovery")
+    model = gp.Model("COVID_Subgroup_Discovery")
     model.setParam('OutputFlag', 1)
 
     # Decision Variables
@@ -183,7 +168,7 @@ def set_objective(model, T, PosRatio, data, n_cases):
 
     #QUADRATIC CONSTRAINT
     try: 
-        positives_dataset = (data['Insgesamt'] > 5000).astype(int)
+        positives_dataset = (data["Sieben-Tage-Inzidenz"] > THRESHOLD_HIGH).astype(int)
         target_share_dataset = positives_dataset.sum() / n_cases
         SD_size = gp.quicksum(T[c] for c in range(n_cases))
         SD_positives = gp.quicksum(positives_dataset[c] * T[c] for c in range(n_cases))
@@ -266,49 +251,24 @@ def main(file_path):
             elapsed_time = end_time - start_time
             print(f"Elapsed time for the optimization pipeline: {elapsed_time:.2f} seconds")
 
-            # Definieren der Subgruppe basierend auf hohen Werten in 'Insgesamt' und 'Langzeitarbeitslose'
-            high_cases = data[(data['Insgesamt'] > 5000) & (data['Langzeitarbeitslose'] > 1600)]
-
-            # Ausgabe der Subgruppe
-            print("Subgroup with high 'Insgesamt' and 'Langzeitarbeitslose':")
-            print(high_cases)
-
-            # Visualisierung der Subgruppe
-            plt.figure(figsize=(10, 6))
-
-            # Scatterplot für alle Daten (grau)
-            plt.scatter(data.index, data['Insgesamt'], color='gray', alpha=0.5, label='Alle Daten')
-
-            # Scatterplot für die hohen Fälle (blau)
-            plt.scatter(high_cases.index, high_cases['Insgesamt'], color='blue', label='High Cases')
-            # Titel und Achsenbeschriftungen
-            plt.title('Gesamtzahl vs. Eintragsindex (Hohe Fälle)')
-            plt.xlabel('Eintragsindex')
-            plt.ylabel('Gesamtzahl der Personen')
-
-            # Legende
+            high_cases = data[data["Sieben-Tage-Inzidenz"] > THRESHOLD_HIGH]
+            plt.scatter(data.index, data["Sieben-Tage-Inzidenz"], color='gray', alpha=0.5, label='All Data')
+            plt.scatter(high_cases.index, high_cases["Sieben-Tage-Inzidenz"], color='red', label='High Cases')
+            plt.xlabel('Index')
+            plt.ylabel('Seven-Day Incidence')
             plt.legend()
-
-            # Plot anzeigen
             plt.show()
-
-
+        
         # Measure memory usage during the complete pipeline
         _, peak_memory = measure_memory_usage(run_optimization_pipeline, file_path)
 
         print(f"The peak memory usage during the optimization for {file_path} was: {peak_memory:.2f} MB")
+            
+        
     except Exception as e:
         print(f"An error occurred during the optimization process: {e}")
 
 if __name__ == "__main__":
-    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/arbeitslosenquote.csv" 
+    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/fb53-altersinzidenzen.csv" 
     main(file_path)  # Pass the file_path argument to main
     
-
-
-#if model.status==3:
- #       model.computeIIS()
- #       model.write("infeasible_model.ilp")
-
- #https://www.gurobi.com/documentation/current/refman/py_model_addconstrs.html
- #https://www.gurobi.com/documentation/current/refman/py_quicksum.html
