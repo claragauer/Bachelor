@@ -301,7 +301,7 @@ def main(file_path):
         print(f"An error occurred during the optimization process: {e}")
 
 if __name__ == "__main__":
-    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/arbeitslosenquote.csv" 
+    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/unemployment.csv" 
     main(file_path)  # Pass the file_path argument to main
     
 

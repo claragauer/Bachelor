@@ -141,7 +141,7 @@ def main(file_path):
         print(f"An error occurred during the main execution: {e}")
 
 if __name__ == "__main__":
-    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/fb53-altersinzidenzen.csv"
+    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/ageSpecificIncidenceRates.csv"
     main(file_path)
 
 

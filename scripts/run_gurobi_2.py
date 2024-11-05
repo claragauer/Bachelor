@@ -158,26 +158,21 @@ def set_objective(model, T, PosRatio, data, n_cases):
         
         # Calculate the target share of positives in the overall dataset
         positives_dataset = (data['7d-Median SARS-CoV-2 Abwasser'] > 1e13).astype(int)
-        target_share_dataset = positives_dataset.sum() / n_cases
-
+        target_share_dataset = positives_dataset.sum() / n_cases  # Overall positive rate
+        
         # Auxiliary variables for subgroup size and number of positives in subgroup
         SD_size = model.addVar(name="SD_size", vtype=GRB.CONTINUOUS)
         SD_positives = model.addVar(name="SD_positives", vtype=GRB.CONTINUOUS)
-
+        
         # Define SD_size as the sum of T[c] (subgroup size)
         model.addConstr(SD_size == gp.quicksum(T[c] for c in range(n_cases)), "SD_size_Definition")
-
+        
         # Define SD_positives as the sum of positive cases in the subgroup
         model.addConstr(SD_positives == gp.quicksum(positives_dataset.iloc[c] * T[c] for c in range(n_cases)), "SD_positives_Definition")
-
-        # Define PosRatio as the proportion of positives in the subgroup
-        model.addConstr(PosRatio * SD_size == SD_positives, "PosRatio_Definition")
-
-        # Reformulate objective: maximize Q_SD = SD_size * (PosRatio - target_share_dataset)
-        Q_SD = SD_size * (SD_positives / SD_size - target_share_dataset)
-        model.setObjective(Q_SD, GRB.MAXIMIZE)
         
-        print("Objective set to maximize WRAcc with correct division structure.")
+        # Reformulate WRAcc objective: maximize WRAcc = (1 / n_cases) * (SD_positives - SD_size * target_share_dataset)
+        Q_WRAcc = (1 / n_cases) * (SD_positives - SD_size * target_share_dataset)
+        model.setObjective(Q_WRAcc, GRB.MAXIMIZE)
         
     except Exception as e:
         print(f"Error in set_objective (WRAcc): {e}")
@@ -272,7 +267,7 @@ def main(file_path):
         print(f"An error occurred during the optimization process: {e}")
 
 if __name__ == "__main__":
-    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/abwasserCovid.csv" 
+    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/covid19wasteWater.csv" 
     main(file_path)  # Pass the file_path argument to main
     
 

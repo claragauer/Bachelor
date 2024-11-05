@@ -289,7 +289,7 @@ def main(file_path):
     return runtime  # Return runtime if needed
 
 if __name__ == "__main__":
-    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/geothermal.csv" 
+    file_path = "/Users/claragazer/Desktop/Bachelorarbeit/Bachelor/data/geothermalData.csv" 
     main(file_path)  # Pass the file_path argument to main
     
 
