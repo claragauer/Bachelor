@@ -56,21 +56,20 @@ def define_selectors(data):
     Returns:
         dict: Dictionary of binary selectors, where each key is a condition and each value is a binary vector.
     """
+    selectors = {}  # Initialize an empty dictionary to store selectors
 
-    selectors = {} # Initialize an empty dictionary to store selectors
-    
-    # Iterate over each column in the data frame to create selectors based on unique values
     for column in data.columns:
-        unique_values = data[column].unique() # Get all unique values in the column 
-        # Create selectors only for columns with a manageable number of unique values to avoid excessive computation.
-        if len(unique_values) <= MAXIMUM_UNIQUE_VALUES:  
-            # Iterate over each unique value to create a corresponding binary selector
-            for value in unique_values:
-                # Create unique selector name by combining the column and the value 
-                selector_name = f"{column}_{value}"
-                selectors[selector_name] = (data[column] == value).astype(int)
+        # Proceed only if the column is numeric
+        if pd.api.types.is_numeric_dtype(data[column]):
+            # Calculate 25% and 75% quantiles for the column
+            threshold_low = data[column].quantile(0.25)
+            threshold_high = data[column].quantile(0.75)
+            
+            # Create high and low selectors based on quantiles
+            selectors[f"High_{column}"] = (data[column] > threshold_high).astype(int)
+            selectors[f"Low_{column}"] = (data[column] < threshold_low).astype(int)
         else:
-            print(f"Skipping column '{column}' due to too many unique values ({len(unique_values)}).")
+            print(f"Skipping column '{column}' because it is not numeric.")
 
     return selectors
 
@@ -142,42 +141,24 @@ def add_constraints(model, n_cases, selectors, T, D):
     # Angleichen von 
 
 def set_objective(model, T, PosRatio, data, n_cases):
-    """
-    Define the objective function for the Gurobi model to maximize the Weighted Relative Accuracy (WRAcc) of the subgroup.
+    # Datenvorbereitung
+    positives = (data['7d-Median SARS-CoV-2 Abwasser'] > 1e13).astype(int).tolist()
+    n = len(data)
+    positive_share = sum(positives) / n
+
+    # Modell und Variablen
+    model = gp.Model("WRAcc")
+    T = model.addVars(n, vtype=GRB.BINARY)
+
+    # Zielfunktion WRAcc
+    wracc = (gp.quicksum(T[i] * positives[i] for i in range(n)) / n) - (T.sum() * positive_share / n)
+    model.setObjective(wracc, GRB.MAXIMIZE)
+
+    # Bedingung und Optimierung
+    model.addConstr(T.sum() >= 1)
+    model.optimize()
+
     
-    Parameters:
-        model (gp.Model): Gurobi model.
-        T (gp.tupledict): Decision variables T.
-        PosRatio (gp.Var): Positive ratio variable.
-        data (pd.DataFrame): Preprocessed DataFrame.
-        n_cases (int): Number of cases.
-    """
-    try:
-        # Update the model to finalize variables before use
-        model.update()
-        
-        # Calculate the target share of positives in the overall dataset
-        positives_dataset = (data['7d-Median SARS-CoV-2 Abwasser'] > 1e13).astype(int)
-        target_share_dataset = positives_dataset.sum() / n_cases  # Overall positive rate
-        
-        # Auxiliary variables for subgroup size and number of positives in subgroup
-        SD_size = model.addVar(name="SD_size", vtype=GRB.CONTINUOUS)
-        SD_positives = model.addVar(name="SD_positives", vtype=GRB.CONTINUOUS)
-        
-        # Define SD_size as the sum of T[c] (subgroup size)
-        model.addConstr(SD_size == gp.quicksum(T[c] for c in range(n_cases)), "SD_size_Definition")
-        
-        # Define SD_positives as the sum of positive cases in the subgroup
-        model.addConstr(SD_positives == gp.quicksum(positives_dataset.iloc[c] * T[c] for c in range(n_cases)), "SD_positives_Definition")
-        
-        # Reformulate WRAcc objective: maximize WRAcc = (1 / n_cases) * (SD_positives - SD_size * target_share_dataset)
-        Q_WRAcc = (1 / n_cases) * (SD_positives - SD_size * target_share_dataset)
-        model.setObjective(Q_WRAcc, GRB.MAXIMIZE)
-        
-    except Exception as e:
-        print(f"Error in set_objective (WRAcc): {e}")
-
-
 def run_optimization(model):
     """
     Run the optimization process and display the results if an optimal solution is found.

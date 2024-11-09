@@ -71,42 +71,20 @@ def define_selectors(data):
     Returns:
         dict: Dictionary of binary selectors, where each key is a condition and each value is a binary vector.
     """
+    selectors = {}  # Initialize an empty dictionary to store selectors
 
-    data['Total_MWe_Mean'].fillna(0, inplace=True)
-    data['NetUndevelopedRP'].fillna(0, inplace=True)
-    data['Acres_GeothermalField'].fillna(0, inplace=True)
-
-    # Define thresholds based on data distribution (e.g., median or quantile-based for flexibility)
-    THRESHOLD_HIGH_CAPACITY = data['Total_MWe_Mean'].quantile(0.75)  # High capacity as the upper quartile
-    THRESHOLD_LOW_CAPACITY = data['Total_MWe_Mean'].quantile(0.25)   # Low capacity as the lower quartile
-
-    THRESHOLD_HIGH_UNDEVELOPED = data['NetUndevelopedRP'].quantile(0.75)  # High potential in upper quartile
-    THRESHOLD_LOW_UNDEVELOPED = data['NetUndevelopedRP'].quantile(0.25)   # Low potential in lower quartile
-
-    THRESHOLD_HIGH_ACRES = data['Acres_GeothermalField'].quantile(0.75)   # High acreage for upper quartile
-    THRESHOLD_LOW_ACRES = data['Acres_GeothermalField'].quantile(0.25)    # Low acreage for lower quartile
-
-    # Initialize selectors dictionary
-    selectors = {}
-
-    # Define selectors based on calculated thresholds
-    selectors["High_Capacity"] = (data["Total_MWe_Mean"] > THRESHOLD_HIGH_CAPACITY).astype(int)
-    selectors["Low_Capacity"] = (data["Total_MWe_Mean"] < THRESHOLD_LOW_CAPACITY).astype(int)
-
-    selectors["High_UndevelopedRP"] = (data["NetUndevelopedRP"] > THRESHOLD_HIGH_UNDEVELOPED).astype(int)
-    selectors["Low_UndevelopedRP"] = (data["NetUndevelopedRP"] < THRESHOLD_LOW_UNDEVELOPED).astype(int)
-
-    selectors["High_Acres"] = (data["Acres_GeothermalField"] > THRESHOLD_HIGH_ACRES).astype(int)
-    selectors["Low_Acres"] = (data["Acres_GeothermalField"] < THRESHOLD_LOW_ACRES).astype(int)
-
-    # Display selector thresholds and sample values for validation
-    print(f"Thresholds:\n High Capacity: {THRESHOLD_HIGH_CAPACITY}, Low Capacity: {THRESHOLD_LOW_CAPACITY}")
-    print(f"High Undeveloped RP: {THRESHOLD_HIGH_UNDEVELOPED}, Low Undeveloped RP: {THRESHOLD_LOW_UNDEVELOPED}")
-    print(f"High Acres: {THRESHOLD_HIGH_ACRES}, Low Acres: {THRESHOLD_LOW_ACRES}")
-
-    # Display results of the selectors
-    for selector_name, selector_values in selectors.items():
-        print(f"{selector_name}: {selector_values.tolist()[:10]}...")  # Display first 10 for brevity
+    for column in data.columns:
+        # Proceed only if the column is numeric
+        if pd.api.types.is_numeric_dtype(data[column]):
+            # Calculate 25% and 75% quantiles for the column
+            threshold_low = data[column].quantile(0.25)
+            threshold_high = data[column].quantile(0.75)
+            
+            # Create high and low selectors based on quantiles
+            selectors[f"High_{column}"] = (data[column] > threshold_high).astype(int)
+            selectors[f"Low_{column}"] = (data[column] < threshold_low).astype(int)
+        else:
+            print(f"Skipping column '{column}' because it is not numeric.")
 
     return selectors
 
@@ -190,13 +168,21 @@ def set_objective(model, T, PosRatio, data, n_cases):
     """
     
     try: 
-        positives_dataset = (data['Total_MWe_Mean'] > 500).astype(int)
-        target_share_dataset = positives_dataset.sum() / n_cases
-        SD_size = gp.quicksum(T[c] for c in range(n_cases))
-        SD_positives = gp.quicksum(positives_dataset[c] * T[c] for c in range(n_cases))
-        model.addConstr(PosRatio * SD_size == SD_positives, "PosRatioConstraint")
-        Q_SD = (SD_size / n_cases) * (PosRatio - target_share_dataset)
-        model.setObjective(Q_SD, GRB.MAXIMIZE)
+        positives = (data['Total_MWe_Mean'] > 500).astype(int)
+        n = len(data)
+        positive_share = sum(positives) / n
+
+        # Modell und Variablen
+        model = gp.Model("WRAcc")
+        T = model.addVars(n, vtype=GRB.BINARY)
+
+        # Zielfunktion WRAcc
+        wracc = (gp.quicksum(T[i] * positives[i] for i in range(n)) / n) - (T.sum() * positive_share / n)
+        model.setObjective(wracc, GRB.MAXIMIZE)
+
+        # Bedingung und Optimierung
+        model.addConstr(T.sum() >= 1)
+        model.optimize()
 
     except Exception as e:
         print(f"Error in set_objective (WRAcc): {e}")
